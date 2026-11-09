@@ -33,6 +33,21 @@ def tasa(cur):  # euros que vale 1 unidad de cur
         raise ValueError('divisa %s no disponible en el BCE' % cur)
     return 1 / _fx['r'][cur]
 
+MES = {m: i + 1 for i, m in enumerate('jan feb mar apr may jun jul aug sep oct nov dec'.split())}
+def fecha_ft(h):
+    m = re.search(r'as of\s+([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})', h, re.I)
+    return '%s-%02d-%02d' % (m.group(3), MES[m.group(1).lower()], int(m.group(2))) if m and m.group(1).lower() in MES else ''
+
+def conv(p, cur):  # devuelve (precio en euros, euros por unidad de la divisa original)
+    cur = cur or 'EUR'
+    if cur == 'EUR':
+        return p, 1.0
+    k = 1.0
+    if cur in ('GBX', 'GBp'):
+        k, cur = 0.01, 'GBP'
+    t = tasa(cur) * k
+    return p * t, t
+
 def a_eur(p, cur):
     cur = cur or 'EUR'
     if cur == 'EUR':
@@ -55,7 +70,7 @@ def ftp(url, moneda=''):
         cur, val = moneda, g.group(1) if g else None
     if not (n and val and cur):
         raise ValueError('sin datos en la ficha de FT')
-    return {'nombre': re.sub(r'<[^>]+>', '', n.group(1)).strip(), 'moneda': cur, 'precio': float(val.replace(',', ''))}
+    return {'nombre': re.sub(r'<[^>]+>', '', n.group(1)).strip(), 'moneda': cur, 'precio': float(val.replace(',', '')), 'fecha': fecha_ft(h)}
 
 def ft(isin):
     errores = []
@@ -105,21 +120,27 @@ def cripto_buscar(q):
              'detalle': 'Cripto · CoinGecko', 'clase': 'cripto'} for c in j.get('coins', [])[:3]]
 
 def precio(fuente, id):
+    fe = ''
     if fuente == 'ft':
-        d = ft(id)
+        d = ft(id); fe = d.get('fecha', '')
     elif fuente == 'ftq':
         if not id.startswith('/data/'):
             raise ValueError('ruta no válida')
-        d = ftp('https://markets.ft.com' + id)
+        d = ftp('https://markets.ft.com' + id); fe = d.get('fecha', '')
     elif fuente == 'yahoo':
         m = yahoo_meta(id)
         d = {'nombre': m.get('longName') or m.get('shortName') or id, 'moneda': m.get('currency'), 'precio': m['regularMarketPrice']}
+        if m.get('regularMarketTime'):
+            fe = time.strftime('%Y-%m-%d', time.gmtime(m['regularMarketTime']))
     elif fuente == 'coingecko':
-        j = http('https://api.coingecko.com/api/v3/simple/price?ids=%s&vs_currencies=eur' % urllib.parse.quote(id))
-        return {'nombre': id, 'moneda': 'EUR', 'precio': j[id]['eur']}
+        j = http('https://api.coingecko.com/api/v3/simple/price?ids=%s&vs_currencies=eur&include_last_updated_at=true' % urllib.parse.quote(id))
+        e = j[id]
+        return {'nombre': id, 'moneda': 'EUR', 'precio': e['eur'], 'orig': e['eur'], 'tc': 1,
+                'fecha': time.strftime('%Y-%m-%d', time.gmtime(e['last_updated_at'])) if e.get('last_updated_at') else ''}
     else:
         raise ValueError('fuente desconocida')
-    return {'nombre': d['nombre'], 'moneda': d['moneda'], 'precio': a_eur(d['precio'], d['moneda'])}
+    p, tc = conv(d['precio'], d['moneda'])
+    return {'nombre': d['nombre'], 'moneda': d['moneda'], 'precio': p, 'orig': d['precio'], 'tc': tc, 'fecha': fe}
 
 def buscar(q):
     r, av = [], []
