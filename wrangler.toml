@@ -1,2 +1,5 @@
-name = "balance"
+name = "tu-proyecto-inversiones"
 compatibility_date = "2026-01-01"
+
+[assets]
+directory = "./"
