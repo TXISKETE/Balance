@@ -24,7 +24,7 @@ function resumen(){
  ${kpi('Patrimonio neto',`<span class="${neto>=0?'':'ko'}">${eur(neto)}</span>`,'activos menos deuda','hero')}
  ${kpi('Efectivo',eur(liq),P(liq,tot)+' de los activos')}
  ${kpi('Invertido',eur(fv),P(fv,tot)+' de los activos')}
- ${kpi('Deuda total',`<span class="ko">${eur(deu)}</span>`,conDeuda.length+' con deuda')}
+ ${kpi('Total efectivo + inversiones',eur(tot),'Activos totales')}
  <section class="s4"><h2>Distribución</h2><div class="donut" style="--p:${tot?liq/tot*100:0}"><div><span><b>${P(liq,tot)}</b><br>efectivo</span></div></div>
   <div class="leg" style="margin-top:12px"><span><i style="background:var(--a)"></i>Efectivo ${P(liq,tot)}</span><span><i style="background:#f59e0b"></i>Invertido ${P(fv,tot)}</span></div>
   <div class="bar"><span style="width:${fv?rv.v/fv*100:0}%"></span><span style="width:${fv?rf.v/fv*100:0}%"></span></div>
@@ -54,20 +54,41 @@ function evol(k,vl){
  const co=(()=>{if(!RG)return'';const d=new Date();d.setMonth(d.getMonth()-RG);return d.toISOString().slice(0,10)})(),V=co?R.filter(r=>r.k>=co):R,
  c=v=>v>=0?'ok':'ko',h=t=>`<td><b>${t}</b></td>`,sr=bs.map((b,j)=>['b'+j,COL[j%COL.length],b]);if(bs.length>1)sr.push(['t','#10b981','Total']);
  return`<section><h2>Evolución</h2><div class="f">${selH('fe',k,[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FE[k])}${selH('fm',k,[['r','Cada registro'],['m','Último registro de cada mes']],FM[k])}${rgSel()}</div>${V.length?`<div style="max-height:360px;overflow:auto"><table><tr>${h('Fecha')}${bs.map(b=>h(b)).join('')}${bs.length>1?h('Total'):''}${h(vl)}</tr>${V.slice().reverse().map(r=>`<tr><td>${fes(r.k)}</td>${bs.map((b,j)=>`<td>${eur(r['b'+j])}</td>`).join('')}${bs.length>1?`<td>${eur(r.t)}</td>`:''}<td class="${c(r.d)}">${r.d==null?'':eur(r.d)}</td></tr>`).join('')}</table></div>`+lineas(V,sr):'<p>Aún no hay datos.</p>'}</section>`}
-function registroDialog(k,l){const q=S.bancos.includes(SEL.b)?SEL.b:S.bancos[0];return`<dialog class="modal" id="regdlg"><form method="dialog" class="modal-card"><button class="modal-x" value="cancel" aria-label="Cerrar">×</button><h2>Nueva aportación</h2><label>Cuenta / banco<select id="b" data-a="selb">${(S.bancos.length?'':'<option value="">Selecciona banco…</option>')+S.bancos.map(b=>`<option${b===q?' selected':''}>${b}</option>`).join('')}<option value="__n">＋ Nuevo banco…</option></select></label><label>Fecha<input type="date" id="d" value="${hoy()}" required></label><label>Importe (€)<input type="number" step="0.01" id="m" placeholder="${l}" required></label><label>Comentario<input id="n" placeholder="Opcional"></label><div class="modal-actions"><button value="cancel">Cancelar</button><button class="p" type="button" data-a="add" data-k="${k}">Guardar aportación</button></div></form></dialog>`}
-function registro(k,l){$('#v').innerHTML=formReg(k,l)+`<details class="fold"><summary>Ver evolución</summary>${evol(k,k==='deudas'?'Variación (cuota)':'Variación')}</details><details class="fold"><summary>Ver registros anteriores (${S[k].length})</summary>${listaReg(k)}</details>`+registroDialog(k,l)}
-function intereses(){
- const co=(()=>{if(!FI.rg)return'';const d=new Date();d.setMonth(d.getMonth()-FI.rg);return d.toISOString().slice(0,10)})(),
- rec=S.intereses.filter(r=>(!FI.banco||r.banco===FI.banco)&&(!co||r.fecha>=co)),
- per=d=>FI.esc==='a'?d.slice(0,4):FI.esc==='t'?d.slice(0,4)+'-T'+Math.ceil(+d.slice(5,7)/3):d.slice(0,7),
- lab=p=>p.includes('-T')?'T'+p.split('-T')[1]+'-'+p.slice(0,4):p.length===7?fm(p):p,
- bs=S.bancos.filter(b=>rec.some(r=>r.banco===b)),ps=[...new Set(rec.map(r=>per(r.fecha)))].sort(),
- R=ps.map(p=>{const v=bs.map(b=>suma(rec.filter(r=>per(r.fecha)===p&&r.banco===b)));return{l:lab(p),v,t:v.reduce((a,b)=>a+b,0)}});
- $('#v').innerHTML=formReg('intereses','Interés')+`<details class="fold"><summary>Ver resumen de intereses</summary><section><h2>Intereses recibidos</h2><div class="f">${selH('fi','banco',[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FI.banco)}${selH('fi','esc',[['m','Por mes'],['t','Por trimestre'],['a','Por año']],FI.esc)}${selH('fi','rg',RGOPT,FI.rg)}</div><div style="max-height:320px;overflow:auto"><table><tr><td><b>Periodo</b></td>${bs.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td></tr>${R.map(x=>`<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td></tr>`).join('')}<tfoot><tr><td>Total</td>${bs.map((b,j)=>`<td>${eur(R.reduce((a,x)=>a+x.v[j],0))}</td>`).join('')}<td>${eur(R.reduce((a,x)=>a+x.t,0))}</td></tr></tfoot></table></div>${barras(R,bs)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés')
+function registroDialog(k,l){const q=S.bancos.includes(SEL.b)?SEL.b:S.bancos[0];return`<dialog class="modal" id="regdlg"><form method="dialog" class="modal-card"><button class="modal-x" type="submit" formnovalidate value="cancel" aria-label="Cerrar">×</button><h2>Nueva aportación</h2><label>Cuenta / banco<select id="b" data-a="selb">${(S.bancos.length?'':'<option value="">Selecciona banco…</option>')+S.bancos.map(b=>`<option${b===q?' selected':''}>${b}</option>`).join('')}<option value="__n">＋ Nuevo banco…</option></select></label><label>Fecha<input type="date" id="d" value="${hoy()}" required></label><label>Importe (€)<input type="number" step="0.01" id="m" placeholder="${l}" required></label><label>Comentario<input id="n" placeholder="Opcional"></label><div class="modal-actions"><button type="submit" formnovalidate value="cancel">Cancelar</button><button class="p" type="button" data-a="add" data-k="${k}">Guardar aportación</button></div></form></dialog>`}
+function balanceStats(k){
+ const rs=S[k],banks=S.bancos.filter(b=>rs.some(r=>r.banco===b));
+ const rows=banks.map(b=>{
+  const own=rs.filter(r=>r.banco===b).sort((a,z)=>a.fecha<z.fecha?-1:1),last=own[own.length-1];
+  const month=last.fecha.slice(0,7),[y,m]=month.split('-').map(Number),prevMonth=new Date(y,m-2,1),cut=prevMonth.getFullYear()+'-'+String(prevMonth.getMonth()+1).padStart(2,'0');
+  const prev=own.filter(r=>r.fecha.slice(0,7)===cut).slice(-1)[0]||own.filter(r=>r.fecha<month+'-01').slice(-1)[0];
+  return{b,value:last.importe,delta:prev?last.importe-prev.importe:null,prev:prev?prev.importe:null};
+ });
+ const value=rows.reduce((a,x)=>a+x.value,0),hasPrev=rows.length>0&&rows.every(x=>x.prev!==null),prev=hasPrev?rows.reduce((a,x)=>a+x.prev,0):null,delta=hasPrev?value-prev:null;
+ const card=(name,v,d,p)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':d>=0?'ok':'ko')+'">'+(d===null?'Sin dato del mes anterior':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
+ return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,delta,prev?delta/prev*100:null)+rows.map(x=>card(x.b,x.value,x.delta,x.prev?x.delta/x.prev*100:null)).join('')+'</div>';
 }
+function registro(k,l){$('#v').innerHTML=formReg(k,l)+balanceStats(k)+`<details class="fold"><summary>Ver evolución</summary>${evol(k,k==='deudas'?'Variación (cuota)':'Variación')}</details><details class="fold"><summary>Ver registros anteriores (${S[k].length})</summary>${listaReg(k)}</details>`+registroDialog(k,l)}
+
+function intereses(){
+ const end=hoy(),period=FI.periodo||'ytd',startFor=v=>{const d=new Date();if(v==='ytd')return d.getFullYear()+'-01-01';if(v==='all')return S.intereses.map(x=>x.fecha).sort()[0]||end;d.setMonth(d.getMonth()-Number(v));return d.toISOString().slice(0,10)},
+ start=startFor(period),rec=S.intereses.filter(r=>r.fecha>=start&&r.fecha<=end&&(!FI.banco||r.banco===FI.banco)),
+ banks=S.bancos.filter(b=>!FI.banco||b===FI.banco),
+ balanceAt=(b,day)=>{const a=S.saldos.filter(x=>x.banco===b&&x.fecha<=day).sort((x,y)=>x.fecha<y.fecha?-1:1);return a.length?a[a.length-1].importe:0},
+ interestFor=b=>rec.filter(r=>r.banco===b).reduce((a,x)=>a+x.importe,0),
+ total=rec.reduce((a,x)=>a+x.importe,0),balance=FI.banco?balanceAt(FI.banco,end):S.bancos.reduce((a,b)=>a+balanceAt(b,end),0),ratio=balance?total/balance*100:null,
+ card=(name,v,base,p)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(base===null?'Sin balance registrado al cierre':'Rentabilidad sobre balance: '+(p===null?'—':p.toFixed(2)+'%')+' · Balance '+eur(base))+'</small></div>',
+ cards='<div class="stat-grid">'+card('Intereses totales',total,balance,ratio)+banks.map(b=>{const v=interestFor(b),base=balanceAt(b,end);return card(b,v,base,base?v/base*100:null)}).join('')+'</div>',
+ opts=[['ytd','Este año'],['1','Último mes'],['3','Últimos 3 meses'],['6','Últimos 6 meses'],['12','Últimos 12 meses'],['all','Todo el histórico']],
+ periods={m:d=>d.slice(0,7),t:d=>d.slice(0,4)+'-T'+Math.ceil(+d.slice(5,7)/3),a:d=>d.slice(0,4)},
+ label=p=>p.includes('-T')?'T'+p.split('-T')[1]+'-'+p.slice(0,4):p.length===7?fm(p):p,
+ ps=[...new Set(rec.map(r=>periods[FI.esc||'m'](r.fecha)))].sort(),
+ R=ps.map(p=>{const v=banks.map(b=>rec.filter(r=>r.banco===b&&periods[FI.esc||'m'](r.fecha)===p).reduce((a,x)=>a+x.importe,0));return{l:label(p),v,t:v.reduce((a,b)=>a+b,0)}});
+ $('#v').innerHTML=formReg('intereses','Interés')+cards+`<div class="f period-filters"><label>Periodo de cálculo ${selH('fi','periodo',opts,period)}</label><label>Agrupar tabla por ${selH('fi','esc',[['m','Mes'],['t','Trimestre'],['a','Año']],FI.esc||'m')}</label><label>Banco ${selH('fi','banco',[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FI.banco)}</label></div><details class="fold"><summary>Ver desglose de intereses</summary><section><h2>Intereses recibidos por periodo</h2><div style="max-height:320px;overflow:auto"><table><tr><td><b>Periodo</b></td>${banks.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td></tr>${R.map(x=>`<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td></tr>`).join('')}<tfoot><tr><td>Total</td>${banks.map((b,j)=>`<td>${eur(R.reduce((a,x)=>a+x.v[j],0))}</td>`).join('')}<td>${eur(R.reduce((a,x)=>a+x.t,0))}</td></tr></tfoot></table></div>${barras(R,banks)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés');
+}
+
 const fm=k=>{const[y,m]=k.split('-');return['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][m-1]+'-'+y.slice(2)};
 const pct=(v,n)=>n?((v/n-1)*100).toFixed(2)+' %':'–';
-let RES=[],SEL={b:'',cart:''},FE={saldos:'',deudas:''},FM={saldos:'r',deudas:'r'},FL={tipo:'',cart:'',fondo:''},RG='',FI={banco:'',esc:'m',rg:''};
+let RES=[],SEL={b:'',cart:''},FE={saldos:'',deudas:''},FM={saldos:'r',deudas:'r'},FL={tipo:'',cart:'',fondo:''},RG='',FI={banco:'',esc:'m',periodo:'ytd'};
 const RGOPT=[['','Todo el histórico'],['3','Últimos 3 meses'],['6','Últimos 6 meses'],['12','Último año'],['24','Últimos 2 años']],
  COL=['#6366f1','#f59e0b','#10b981','#ef4444','#06b6d4','#a855f7','#84cc16','#f97316'],
  MON='€',num=v=>v.toLocaleString('es-ES',{maximumFractionDigits:v%1&&Math.abs(v)<100?2:0})+'\u00a0'+MON,
@@ -95,7 +116,7 @@ const CLA={fondo:'Fondo',accion:'Acción',etf:'ETF',cripto:'Cripto'},dec=f=>f.cl
  pSub=f=>{const d=f.fp||(f.hist.slice(-1)[0]||{}).fecha;return(d?(f.fpd?'precio del ':'actualizado el ')+fes(d):'sin fecha')+(ext(f)&&f.tc?` · 1 ${f.moneda} = ${(+f.tc).toFixed(4)} €`:'')},
  tablaM=(r,p)=>`<div style="max-height:320px;overflow:auto"><table><tr><td><b>Fecha</b></td><td><b>Aportación</b></td>${p?'<td><b>Particip.</b></td>':''}<td><b>Total aportado</b></td><td><b>Valor acum.</b></td></tr>${r.map(x=>`<tr><td>${fm(x.k)}</td><td>${eur(x.ap)}</td>${p?`<td>${x.pa.toFixed(p)}</td>`:''}<td>${eur(x.t)}</td><td>${eur(x.val)}</td></tr>`).join('')}</table></div>`,
  resHTML=()=>RES.map((r,j)=>`<div class="f" style="align-items:center"><span style="flex:1">${r.nombre}<br><small style="color:var(--m)">${r.detalle}</small></span><button class="p" data-a="addres" data-r="${j}">Añadir</button></div>`).join('');
-function inversionDialog(){return`<dialog class="modal" id="apdlg"><form method="dialog" class="modal-card"><button class="modal-x" value="cancel" aria-label="Cerrar">×</button><h2>Nueva aportación</h2><label>Fecha<input type="date" id="apfecha" value="${hoy()}" required></label><label>Precio de compra (€)<input type="number" step="any" id="apprecio" placeholder="Precio por participación" required></label><label>Número de participaciones<input type="number" step="any" id="appart" placeholder="Cantidad" required></label><label>Comentario<input id="apnota" placeholder="Opcional"></label><div class="modal-actions"><button value="cancel">Cancelar</button><button class="p" type="button" data-a="ap">Guardar aportación</button></div></form></dialog>`}
+function inversionDialog(){return`<dialog class="modal" id="apdlg"><form method="dialog" class="modal-card"><button class="modal-x" type="submit" formnovalidate value="cancel" aria-label="Cerrar">×</button><h2>Nueva aportación</h2><label>Fecha<input type="date" id="apfecha" value="${hoy()}" required></label><label>Precio de compra (€)<input type="number" step="any" id="apprecio" placeholder="Precio por participación" required></label><label>Número de participaciones<input type="number" step="any" id="appart" placeholder="Cantidad" required></label><label>Comentario<input id="apnota" placeholder="Opcional"></label><div class="modal-actions"><button type="submit" formnovalidate value="cancel">Cancelar</button><button class="p" type="button" data-a="ap">Guardar aportación</button></div></form></dialog>`}
 function inversiones(){
  const M=meses(),SR=S.fondos.map(f=>serie(f,M)),
  ok=S.fondos.map((f,i)=>i).filter(i=>(!FL.tipo||(S.fondos[i].tipo||'V')===FL.tipo)&&(!FL.cart||S.fondos[i].cartera===FL.cart)),
@@ -103,7 +124,7 @@ function inversiones(){
  sm=(i,c)=>sel.reduce((s,j)=>s+SR[j][i][c],0),
  AC=cut(sel.length===1?SR[sel[0]]:M.map((k,i)=>({k,ap:sm(i,'ap'),t:sm(i,'t'),val:sm(i,'val')})));
  const act=i=>{const f=S.fondos[i],p=parts(f),n=inv(f),v=p*f.vl,u=f.hist.slice(-1)[0],c=v>=n?'ok':'ko';
- return`<details class="sub" ${dop('a:'+f.n+'|'+f.cartera)}><summary><b>${f.n}</b><span class="${c}">${eur(v-n)} · ${pct(v,n)}</span></summary><div class="f"><button data-a="delact" data-i="${i}">Eliminar activo</button></div><small>${CLA[f.clase]||''} ${f.ext||''}${f.moneda&&f.moneda!=='EUR'?' · '+f.moneda+' → EUR':''}</small>
+ return`<details class="sub" ${dop('a:'+f.n+'|'+f.cartera)}><summary><b>${f.n}</b><span class="inv-summary-values"><span class="inv-total">${eur(v)}</span><span class="${c}">${eur(v-n)} · ${pct(v,n)}</span></span></summary><div class="f"><button data-a="delact" data-i="${i}">Eliminar activo</button></div><small>${CLA[f.clase]||''} ${f.ext||''}${f.moneda&&f.moneda!=='EUR'?' · '+f.moneda+' → EUR':''}</small>
  <div class="g">${kp('Precio actual',pf(f.vl)+' €'+(ext(f)?` <small style="display:inline;margin-left:4px">${pf(f.vlo)} ${SIM[f.moneda]||f.moneda}</small>`:''),'',pSub(f))}${kp('Dinero invertido',eur(n))}${kp('Participaciones',p.toFixed(dec(f)))}${kp('Precio medio de compra',(p?n/p:0).toFixed(2)+' €')}${kp('Valor actual',eur(v))}${kp('Beneficio',eur(v-n)+' · '+pct(v,n),c)}</div>
  <div class="f">${f.fuente?'':`<label>Precio actual (manual) <input type="number" step="any" value="${f.vl}" data-a="vl" data-i="${i}"></label>`}<label>Tipo ${selH('tipo','',[['V','Renta variable'],['F','Renta fija']],f.tipo||'V',i)}</label><label>Cartera ${selH('mv','',S.carteras.map(c=>[c.n,c.n]),f.cartera,i)}</label></div>
  <div class="f"><button class="p" data-a="openap" data-i="${i}">＋ Añadir aportación</button></div>
