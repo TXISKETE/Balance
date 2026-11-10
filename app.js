@@ -133,7 +133,7 @@ function migrar(){S.fondos=S.fondos||[];S.carteras=S.carteras||[];if(!S.carteras
  S.fondos.forEach(f=>{if(!f.cartera||!S.carteras.some(c=>c.n===f.cartera))f.cartera=S.carteras[0].n;if(f.isin&&!f.fuente){f.fuente='ft';f.ext=f.isin}f.clase=f.clase||'fondo';f.hist=f.hist||[];
   if(f.com&&f.com.length){const c=S.carteras.find(c=>c.n===f.cartera);f.com.forEach(x=>c.com.push({...x,nota:f.n+(x.nota?': '+x.nota:'')}))}delete f.com});ordenar()}
 function setVl(f,v,fecha,orig,tc){v=Math.round(v*1e6)/1e6;f.vl=v;if(orig!==undefined){f.vlo=orig;f.tc=tc}f.hist=f.hist||[];const d=fecha||hoy();f.fp=d;f.fpd=fecha?1:0;const h=f.hist.find(x=>x.fecha===d);h?h.vl=v:f.hist.push({fecha:d,vl:v})}
-async function api(u){const r=await fetch(u,{headers:CFG.tok?{'X-Token':CFG.tok}:{}});let d;try{d=await r.json()}catch(e){throw new Error('el servidor no es servidor.py; páralo (Ctrl+C) y ejecuta: python servidor.py')}if(!r.ok)throw new Error(d.error||'Error');return d}
+async function api(u){const r=await fetch(u);let d;try{d=await r.json()}catch(e){throw new Error('el servidor no es servidor.py; páralo (Ctrl+C) y ejecuta: python servidor.py')}if(!r.ok)throw new Error(d.error||'Error');return d}
 const msg=t=>{const m=$('#msg');if(m)m.textContent=t};
 async function buscarAct(){const q=$('#q').value.trim();if(!q)return;msg('Buscando…');try{const d=await api('/api/buscar?q='+encodeURIComponent(q));RES=d.r;$('#res').innerHTML=resHTML();msg((RES.length?'':'Sin resultados. ')+(d.avisos.length?'Avisos: '+d.avisos.join(' · '):''))}catch(e){msg('No se pudo: '+e.message)}}
 async function anadir(j){const r=RES[j],c=$('#cart').value;if(S.fondos.some(f=>f.fuente===r.fuente&&f.ext===r.id&&f.cartera===c))return msg('Ya está en esa cartera');msg('Añadiendo…');
@@ -173,10 +173,10 @@ async function derivar(pw,salt){const m=await crypto.subtle.importKey('raw',new 
 async function nuevaClave(pw){VAULT.salt=crypto.getRandomValues(new Uint8Array(16));VAULT.key=await derivar(pw,VAULT.salt);VAULT.pw=pw}
 async function cifrar(){const iv=crypto.getRandomValues(new Uint8Array(12)),c=await crypto.subtle.encrypt({name:'AES-GCM',iv},VAULT.key,new TextEncoder().encode(JSON.stringify(S)));return JSON.stringify({s:b64(VAULT.salt),i:b64(iv),c:b64(new Uint8Array(c)),t:Date.now()})}
 async function abrir(txt,pw){const o=JSON.parse(txt),salt=ub(o.s),key=await derivar(pw,salt),p=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(o.i)},key,ub(o.c));VAULT.key=key;VAULT.salt=salt;VAULT.t=o.t;VAULT.pw=pw;return JSON.parse(new TextDecoder().decode(p))}
-async function remoto(){const r=await fetch('/api/datos',{headers:{'X-Token':CFG.tok}});if(r.status===204)return null;if(r.status===401)throw new Error('Token incorrecto');if(!r.ok)throw new Error('Error '+r.status);return r.text()}
+async function remoto(){const r=await fetch('/api/datos');if(r.status===204)return null;if(r.status===401)throw new Error('Token incorrecto');if(!r.ok)throw new Error('Error '+r.status);return r.text()}
 function volcar(){clearTimeout(vt);vt=setTimeout(sube,400)}
 async function sube(){if(busy){again=1;return}busy=1;
- try{const b=await cifrar();try{localStorage.setItem('fin_blob',b)}catch(e){}est('Guardando…');const r=await fetch('/api/datos',{method:'PUT',headers:{'X-Token':CFG.tok,'X-Base':String(VAULT.t||0)},body:b});
+ try{const b=await cifrar();try{localStorage.setItem('fin_blob',b)}catch(e){}est('Guardando…');const r=await fetch('/api/datos',{method:'PUT',headers:{'X-Base':String(VAULT.t||0)},body:b});
   if(r.status===409){busy=0;alert('Los datos se cambiaron en otro dispositivo. Se cargará la versión más reciente.');await recargar();return}
   if(!r.ok)throw new Error(r.status);VAULT.t=JSON.parse(b).t;est('☁ Sincronizado')}catch(e){est('⚠ Sin sincronizar')}
  busy=0;if(again){again=0;sube()}}
@@ -186,15 +186,15 @@ async function desbloquear(pw){const m=t=>{const e=$('#msg2');if(e)e.textContent
   if(txt)S=await abrir(txt,pw);else{await nuevaClave(pw);try{const l=JSON.parse(localStorage.getItem(K)||'null');if(l)S=l}catch(e){}}
   migrar();go('Resumen');est(off?'⚠ Sin conexión (copia local)':'☁ Sincronizado');if(!txt)sube()}
  catch(e){VAULT.key=null;m(e.name==='OperationError'?'Contraseña incorrecta':'No se pudo: '+e.message)}}
-async function activar(){const m=t=>{const e=$('#msgA');if(e)e.textContent=t},t=$('#tok').value.trim(),a=$('#pw1').value;
+async function activar(){const m=t=>{const e=$('#msgA');if(e)e.textContent=t},a=$('#pw1').value;
  if(!window.crypto||!crypto.subtle)return m('El cifrado solo funciona abriendo la app por https (tu página de Cloudflare) o en localhost.');
- if(!t||!a)return m('Falta el token o la contraseña');if(a!==$('#pw2').value)return m('Las contraseñas no coinciden');if(a.length<8)return m('Usa al menos 8 caracteres');
- CFG={tok:t};m('Comprobando…');
+ if(!a)return m('Falta la contraseña');if(a!==$('#pw2').value)return m('Las contraseñas no coinciden');if(a.length<8)return m('Usa al menos 8 caracteres');
+ CFG={sync:true};m('Comprobando…');
  try{const txt=await remoto();if(txt){if(!confirm('Ya hay datos guardados en la nube. ¿Cargarlos aquí? Se sustituirán los datos de este dispositivo.')){CFG={};return m('')}S=await abrir(txt,a)}else await nuevaClave(a);
   localStorage.setItem('fin_cfg',JSON.stringify(CFG));migrar();await sube();if(VAULT.t)localStorage.removeItem(K);go('Ajustes')}
  catch(e){CFG={};VAULT.key=null;m(e.name==='OperationError'?'Esa contraseña no corresponde a los datos que hay en la nube':'No se pudo: '+e.message)}}
 function ajustes(){const ok=VAULT.key;$('#v').innerHTML=ok?`<section><h2>Sincronización</h2><p>Los datos se cifran en este dispositivo y en la nube solo hay un bloque ilegible. Estado: <b>${($('#est')||{}).textContent||''}</b></p><div class="f"><button data-a="subir">Sincronizar ahora</button><button data-a="bloq">Bloquear</button></div><p style="color:var(--m)">Si pierdes la contraseña, los datos no se pueden recuperar. «Exportar copia» (en Resumen) genera un archivo sin cifrar.</p></section>`
- :`<section><h2>Sincronización y cifrado</h2><p style="color:var(--m)">Necesitas la app publicada en Cloudflare con el token configurado. Los datos se cifran aquí con tu contraseña antes de enviarse, y se descifran en cada dispositivo al entrar.</p><div class="f"><input id="tok" placeholder="Token de acceso"></div><div class="f"><input type="password" id="pw1" placeholder="Contraseña de cifrado (mín. 8)"><input type="password" id="pw2" placeholder="Repite la contraseña"></div><div class="f"><button class="p" data-a="sync">Activar</button></div><p id="msgA"></p></section>`}
+ :`<section><h2>Sincronización y cifrado</h2><p style="color:var(--m)">Introduce una contraseña de cifrado (mínimo 8 caracteres). Será la misma en todos tus dispositivos. Los datos se cifran antes de enviarse a la nube.</p><div class="f"><input type="password" id="pw1" placeholder="Contraseña de cifrado (mín. 8)"><input type="password" id="pw2" placeholder="Repite la contraseña"></div><div class="f"><button class="p" data-a="sync">Activar</button></div><p id="msgA"></p></section>`}
 document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(e.target.id==='q'){e.preventDefault();buscarAct()}else if(e.target.id==='pwl'){e.preventDefault();desbloquear(e.target.value)}});
 function arranque(){try{CFG=JSON.parse(localStorage.getItem('fin_cfg')||'{}')}catch(e){CFG={}}
  if(!CFG.tok){migrar();go('Resumen');return}
