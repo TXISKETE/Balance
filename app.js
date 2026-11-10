@@ -9,8 +9,8 @@ const ultimo=(a,b)=>{const x=a.filter(r=>r.banco===b).sort((p,q)=>p.fecha<q.fech
 const suma=a=>a.reduce((s,r)=>s+r.importe,0);
 const parts=f=>f.ap.reduce((s,a)=>s+a.part,0);
 const inv=f=>f.ap.reduce((s,a)=>s+a.part*a.vl,0);
-function go(t){const mismo=t===tab,y=window.scrollY;document.querySelectorAll('#v details[data-o]').forEach(d=>d.open?OPEN.add(d.dataset.o):OPEN.delete(d.dataset.o));tab=t;$('#nav').innerHTML=TABS.map(x=>`<button class="${x===t?'on':''}" data-tab="${x}">${x}</button>`).join('');
- ({Resumen:resumen,Cuentas:()=>registro('saldos','Saldo'),Deudas:()=>registro('deudas','Deuda'),Inversiones:inversiones,Intereses:intereses,Histórico:historico,Ajustes:ajustes})[t]();if(mismo)window.scrollTo(0,y)}
+function go(t){const mismo=t===tab,y=window.scrollY,states=[...document.querySelectorAll('#v details')].map(d=>d.open);document.querySelectorAll('#v details[data-o]').forEach(d=>d.open?OPEN.add(d.dataset.o):OPEN.delete(d.dataset.o));tab=t;$('#nav').innerHTML=TABS.map(x=>`<button class="${x===t?'on':''}" data-tab="${x}">${x}</button>`).join('');
+ ({Resumen:resumen,Cuentas:()=>registro('saldos','Saldo'),Deudas:()=>registro('deudas','Deuda'),Inversiones:inversiones,Intereses:intereses,Histórico:historico,Ajustes:ajustes})[t]();document.querySelectorAll('#v details').forEach((d,i)=>{if(i<states.length)d.open=states[i]});if(mismo)window.scrollTo(0,y)}
 function resumen(){
  const liq=S.bancos.reduce((s,b)=>s+ultimo(S.saldos,b),0),F=S.fondos.map(f=>({f,n:inv(f),v:parts(f)*f.vl})),
  fv=F.reduce((s,x)=>s+x.v,0),deu=S.bancos.reduce((s,b)=>s+ultimo(S.deudas,b),0),tot=liq+fv,neto=tot-deu,
@@ -52,7 +52,7 @@ function evol(k,vl){
  R=D.map(d=>{const v=bs.map(b=>en(b,d)),o={k:d,t:v.reduce((a,b)=>a+b,0)};v.forEach((x,j)=>o['b'+j]=x);return o});
  R.forEach((r,i)=>r.d=i?r.t-R[i-1].t:null);
  const co=(()=>{if(!RG)return'';const d=new Date();d.setMonth(d.getMonth()-RG);return d.toISOString().slice(0,10)})(),V=co?R.filter(r=>r.k>=co):R,
- c=v=>v>=0?'ok':'ko',h=t=>`<td><b>${t}</b></td>`,sr=bs.map((b,j)=>['b'+j,COL[j%COL.length],b]);if(bs.length>1)sr.push(['t','#10b981','Total']);
+ c=v=>k==='deudas'?(v<=0?'ok':'ko'):(v>=0?'ok':'ko'),h=t=>`<td><b>${t}</b></td>`,sr=bs.map((b,j)=>['b'+j,COL[j%COL.length],b]);if(bs.length>1)sr.push(['t','#10b981','Total']);
  return`<section><h2>Evolución</h2><div class="f">${selH('fe',k,[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FE[k])}${selH('fm',k,[['r','Cada registro'],['m','Último registro de cada mes']],FM[k])}${rgSel()}</div>${V.length?`<div style="max-height:360px;overflow:auto"><table><tr>${h('Fecha')}${bs.map(b=>h(b)).join('')}${bs.length>1?h('Total'):''}${h(vl)}</tr>${V.slice().reverse().map(r=>`<tr><td>${fes(r.k)}</td>${bs.map((b,j)=>`<td>${eur(r['b'+j])}</td>`).join('')}${bs.length>1?`<td>${eur(r.t)}</td>`:''}<td class="${c(r.d)}">${r.d==null?'':eur(r.d)}</td></tr>`).join('')}</table></div>`+lineas(V,sr):'<p>Aún no hay datos.</p>'}</section>`}
 function registroDialog(k,l){const q=S.bancos.includes(SEL.b)?SEL.b:S.bancos[0];return`<dialog class="modal" id="regdlg"><form method="dialog" class="modal-card"><button class="modal-x" type="submit" formnovalidate value="cancel" aria-label="Cerrar">×</button><h2>Nueva aportación</h2><label>Cuenta / banco<select id="b" data-a="selb">${(S.bancos.length?'':'<option value="">Selecciona banco…</option>')+S.bancos.map(b=>`<option${b===q?' selected':''}>${b}</option>`).join('')}<option value="__n">＋ Nuevo banco…</option></select></label><label>Fecha<input type="date" id="d" value="${hoy()}" required></label><label>Importe (€)<input type="number" step="0.01" id="m" placeholder="${l}" required></label><label>Comentario<input id="n" placeholder="Opcional"></label><div class="modal-actions"><button type="submit" formnovalidate value="cancel">Cancelar</button><button class="p" type="button" data-a="add" data-k="${k}">Guardar aportación</button></div></form></dialog>`}
 function balanceStats(k){
@@ -64,26 +64,31 @@ function balanceStats(k){
   return{b,value:last.importe,delta:prev?last.importe-prev.importe:null,prev:prev?prev.importe:null};
  });
  const value=rows.reduce((a,x)=>a+x.value,0),hasPrev=rows.length>0&&rows.every(x=>x.prev!==null),prev=hasPrev?rows.reduce((a,x)=>a+x.prev,0):null,delta=hasPrev?value-prev:null;
- const card=(name,v,d,p)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':d>=0?'ok':'ko')+'">'+(d===null?'Sin dato del mes anterior':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
+ const card=(name,v,d,p)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':(k==='deudas'?(d<=0?'ok':'ko'):(d>=0?'ok':'ko')))+'">'+(d===null?'Sin dato del mes anterior':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
  return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,delta,prev?delta/prev*100:null)+rows.map(x=>card(x.b,x.value,x.delta,x.prev?x.delta/x.prev*100:null)).join('')+'</div>';
 }
 function registro(k,l){$('#v').innerHTML=formReg(k,l)+balanceStats(k)+`<details class="fold"><summary>Ver evolución</summary>${evol(k,k==='deudas'?'Variación (cuota)':'Variación')}</details><details class="fold"><summary>Ver registros anteriores (${S[k].length})</summary>${listaReg(k)}</details>`+registroDialog(k,l)}
 
 function intereses(){
- const end=hoy(),period=FI.periodo||'ytd',startFor=v=>{const d=new Date();if(v==='ytd')return d.getFullYear()+'-01-01';if(v==='all')return S.intereses.map(x=>x.fecha).sort()[0]||end;d.setMonth(d.getMonth()-Number(v));return d.toISOString().slice(0,10)},
+ const end=hoy(),period=FI.periodo||'ytd',
+ startFor=v=>{const d=new Date();if(v==='ytd')return d.getFullYear()+'-01-01';if(v==='all')return S.intereses.map(x=>x.fecha).sort()[0]||end;d.setMonth(d.getMonth()-Number(v));return d.toISOString().slice(0,10)},
  start=startFor(period),rec=S.intereses.filter(r=>r.fecha>=start&&r.fecha<=end&&(!FI.banco||r.banco===FI.banco)),
  banks=S.bancos.filter(b=>!FI.banco||b===FI.banco),
- balanceAt=(b,day)=>{const a=S.saldos.filter(x=>x.banco===b&&x.fecha<=day).sort((x,y)=>x.fecha<y.fecha?-1:1);return a.length?a[a.length-1].importe:0},
+ balanceAt=(b,day)=>{const a=S.saldos.filter(x=>x.banco===b&&x.fecha<=day).sort((x,y)=>x.fecha<y.fecha?-1:1);return a.length?a[a.length-1].importe:null},
+ months=[...new Set(rec.map(r=>r.fecha.slice(0,7)))].sort(),
+ monthEnd=m=>{const[y,n]=m.split('-').map(Number);return y+'-'+String(n).padStart(2,'0')+'-'+String(new Date(y,n,0).getDate()).padStart(2,'0')},
+ monthStats=(b,m)=>{const amount=rec.filter(r=>r.banco===b&&r.fecha.slice(0,7)===m).reduce((a,x)=>a+x.importe,0),base=balanceAt(b,monthEnd(m));return{amount,base,rate:base!==null&&base!==0?amount/base*100:null}},
+ stats=b=>months.map(m=>monthStats(b,m)),
  interestFor=b=>rec.filter(r=>r.banco===b).reduce((a,x)=>a+x.importe,0),
- total=rec.reduce((a,x)=>a+x.importe,0),balance=FI.banco?balanceAt(FI.banco,end):S.bancos.reduce((a,b)=>a+balanceAt(b,end),0),ratio=balance?total/balance*100:null,
- card=(name,v,base,p)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(base===null?'Sin balance registrado al cierre':'Rentabilidad sobre balance: '+(p===null?'—':p.toFixed(2)+'%')+' · Balance '+eur(base))+'</small></div>',
- cards='<div class="stat-grid">'+card('Intereses totales',total,balance,ratio)+banks.map(b=>{const v=interestFor(b),base=balanceAt(b,end);return card(b,v,base,base?v/base*100:null)}).join('')+'</div>',
+ rateFor=b=>{const z=stats(b);return z.some(x=>x.rate!==null)?z.reduce((a,x)=>a+(x.rate||0),0):null},
+ total=rec.reduce((a,x)=>a+x.importe,0),
+ totalRate=months.reduce((sum,m)=>{const rows=banks.map(b=>monthStats(b,m)).filter(x=>x.base!==null),base=rows.reduce((a,x)=>a+x.base,0),amount=rows.reduce((a,x)=>a+x.amount,0);return sum+(base?amount/base*100:0)},0),
+ card=(name,v,p,detail)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(p===null?'Sin balance mensual disponible': 'Rentabilidad acumulada del periodo: '+p.toFixed(2)+'%'+(detail?' · '+detail:''))+'</small></div>',
+ cards='<div class="stat-grid">'+card('Intereses totales',total,totalRate,'suma de rentabilidades mensuales')+banks.map(b=>card(b,interestFor(b),rateFor(b),'calculada mes a mes')).join('')+'</div>',
  opts=[['ytd','Este año'],['1','Último mes'],['3','Últimos 3 meses'],['6','Últimos 6 meses'],['12','Últimos 12 meses'],['all','Todo el histórico']],
- periods={m:d=>d.slice(0,7),t:d=>d.slice(0,4)+'-T'+Math.ceil(+d.slice(5,7)/3),a:d=>d.slice(0,4)},
- label=p=>p.includes('-T')?'T'+p.split('-T')[1]+'-'+p.slice(0,4):p.length===7?fm(p):p,
- ps=[...new Set(rec.map(r=>periods[FI.esc||'m'](r.fecha)))].sort(),
- R=ps.map(p=>{const v=banks.map(b=>rec.filter(r=>r.banco===b&&periods[FI.esc||'m'](r.fecha)===p).reduce((a,x)=>a+x.importe,0));return{l:label(p),v,t:v.reduce((a,b)=>a+b,0)}});
- $('#v').innerHTML=formReg('intereses','Interés')+cards+`<div class="f period-filters"><label>Periodo de cálculo ${selH('fi','periodo',opts,period)}</label><label>Agrupar tabla por ${selH('fi','esc',[['m','Mes'],['t','Trimestre'],['a','Año']],FI.esc||'m')}</label><label>Banco ${selH('fi','banco',[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FI.banco)}</label></div><details class="fold"><summary>Ver desglose de intereses</summary><section><h2>Intereses recibidos por periodo</h2><div style="max-height:320px;overflow:auto"><table><tr><td><b>Periodo</b></td>${banks.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td></tr>${R.map(x=>`<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td></tr>`).join('')}<tfoot><tr><td>Total</td>${banks.map((b,j)=>`<td>${eur(R.reduce((a,x)=>a+x.v[j],0))}</td>`).join('')}<td>${eur(R.reduce((a,x)=>a+x.t,0))}</td></tr></tfoot></table></div>${barras(R,banks)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés');
+ R=months.map(m=>{const v=banks.map(b=>monthStats(b,m).amount);return{l:fm(m),v,t:v.reduce((a,b)=>a+b,0)}}),
+ rateRows=months.map(m=>{const z=banks.map(b=>monthStats(b,m));const valid=z.filter(x=>x.base!==null&&x.base!==0);return{m,rate:valid.length?valid.reduce((a,x)=>a+x.rate,0):null}});
+ $('#v').innerHTML=formReg('intereses','Interés')+cards+`<div class="f period-filters"><label>Periodo de cálculo ${selH('fi','periodo',opts,period)}</label><label>Banco ${selH('fi','banco',[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FI.banco)}</label></div><details class="fold"><summary>Ver desglose de intereses</summary><section><h2>Intereses recibidos por mes</h2><div style="max-height:320px;overflow:auto"><table><tr><td><b>Mes</b></td>${banks.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td><td><b>Rentabilidad mensual</b></td></tr>${R.map((x,i)=>`<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td><td>${rateRows[i].rate===null?'—':rateRows[i].rate.toFixed(2)+'%'}</td></tr>`).join('')}</table></div>${barras(R,banks)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés');
 }
 
 const fm=k=>{const[y,m]=k.split('-');return['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][m-1]+'-'+y.slice(2)};
@@ -189,7 +194,7 @@ document.addEventListener('click',e=>{const t=e.target,a=t.dataset.a,i=+t.datase
  else if(a==='bloq'){location.reload();return}
  else return;
  save();go(tab)});
-document.addEventListener('change',e=>{const t=e.target;if(t.dataset.a==='selb'){if(t.value==='__n'){const n=(prompt('Nombre del banco nuevo')||'').trim();if(n){if(!S.bancos.includes(n))S.bancos.push(n);SEL.b=n;save()}}else SEL.b=t.value;go(tab)}if(t.dataset.a==='selc'){if(t.value==='__n'){const n=(prompt('Nombre de la nueva cartera')||'').trim();if(n){if(!S.carteras.some(c=>c.n===n))S.carteras.push({n,com:[]});SEL.cart=n;save()}}else SEL.cart=t.value;go(tab)}if(t.dataset.a==='fm'){FM[t.dataset.k]=t.value;go(tab)}if(t.dataset.a==='fe'){FE[t.dataset.k]=t.value;go(tab)}if(t.dataset.a==='mv'){S.fondos[+t.dataset.i].cartera=t.value;save();go(tab)}if(t.dataset.a==='rg'){RG=t.value;go(tab)}if(t.dataset.a==='fi'){FI[t.dataset.k]=t.value;go(tab)}if(t.dataset.a==='flt'){FL[t.dataset.k]=t.value;go(tab)}if(t.dataset.a==='tipo'){S.fondos[+t.dataset.i].tipo=t.value;save();go(tab)}if(t.dataset.a==='vl'){setVl(S.fondos[+t.dataset.i],parseFloat(t.value)||0);save();go(tab)}});
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset.a==='selb'){if(t.value==='__n'){const n=(prompt('Nombre del banco nuevo')||'').trim();if(n){if(!S.bancos.includes(n)){S.bancos.push(n);const o=document.createElement('option');o.value=n;o.textContent=n;t.insertBefore(o,t.lastElementChild)}SEL.b=n;t.value=n;save()}else t.value=SEL.b||S.bancos[0]||''}else SEL.b=t.value}if(t.dataset.a==='selc'){if(t.value==='__n'){const n=(prompt('Nombre de la nueva cartera')||'').trim();if(n){if(!S.carteras.some(c=>c.n===n))S.carteras.push({n,com:[]});SEL.cart=n;save()}}else SEL.cart=t.value;go(tab)}if(t.dataset.a==='fm'){FM[t.dataset.k]=t.value;go(tab)}if(t.dataset.a==='fe'){FE[t.dataset.k]=t.value;go(tab)}if(t.dataset.a==='mv'){S.fondos[+t.dataset.i].cartera=t.value;save();go(tab)}if(t.dataset.a==='rg'){RG=t.value;go(tab)}if(t.dataset.a==='fi'){FI[t.dataset.k]=t.value;go(tab)}if(t.dataset.a==='flt'){FL[t.dataset.k]=t.value;go(tab)}if(t.dataset.a==='tipo'){S.fondos[+t.dataset.i].tipo=t.value;save();go(tab)}if(t.dataset.a==='vl'){setVl(S.fondos[+t.dataset.i],parseFloat(t.value)||0);save();go(tab)}});
 $('#imp').addEventListener('change',e=>{const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.bancos||!d.fondos)throw 0;S=d;migrar();save();go('Resumen')}catch(x){alert('Archivo no válido')}};r.readAsText(e.target.files[0])});
 // ---- Sincronización cifrada (opcional): los datos se cifran en este dispositivo con tu contraseña
 let CFG={},VAULT={key:null,salt:null,t:0,pw:''},busy=0,again=0,vt=null;
