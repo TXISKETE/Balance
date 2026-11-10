@@ -45,9 +45,14 @@ async function datos(req,env){
   return J({t:n.t})}
  return J({error:'método no permitido'},405)}
 export default{async fetch(req,env){const u=new URL(req.url);if(!u.pathname.startsWith('/api/'))return env.ASSETS.fetch(req);
- try{if(!env.TOKEN)throw Object.assign(new Error('Falta el secreto TOKEN'),{s:500});if(req.headers.get('x-token')!==env.TOKEN)throw Object.assign(new Error('Token incorrecto'),{s:401});
+ try{
   const g=k=>(u.searchParams.get(k)||'').trim();
+  if(u.pathname==='/api/estado'){
+   if(!env.DB)return J({ok:false,error:'No está conectado el binding D1 DB'},500);
+   await env.DB.prepare('SELECT 1 AS ok').first();
+   return J({ok:true,d1:true});
+  }
   if(u.pathname==='/api/datos')return await datos(req,env);
   if(u.pathname==='/api/buscar')return J(await buscar(g('q')));
   if(u.pathname==='/api/precio')return J(await precio(g('fuente'),g('id')));
-  return J({error:'ruta desconocida'},404)}catch(e){return J({error:e.message},e.s||502)}}};
+  return J({error:'ruta desconocida'},404)}catch(e){return J({error:e.message},e.s||500)}}};
