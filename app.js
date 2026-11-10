@@ -197,6 +197,6 @@ function ajustes(){const ok=VAULT.key;$('#v').innerHTML=ok?`<section><h2>Sincron
  :`<section><h2>Sincronización y cifrado</h2><p style="color:var(--m)">Introduce una contraseña de cifrado (mínimo 8 caracteres). Será la misma en todos tus dispositivos. Los datos se cifran antes de enviarse a la nube.</p><div class="f"><input type="password" id="pw1" placeholder="Contraseña de cifrado (mín. 8)"><input type="password" id="pw2" placeholder="Repite la contraseña"></div><div class="f"><button class="p" data-a="sync">Activar</button></div><p id="msgA"></p></section>`}
 document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(e.target.id==='q'){e.preventDefault();buscarAct()}else if(e.target.id==='pwl'){e.preventDefault();desbloquear(e.target.value)}});
 function arranque(){try{CFG=JSON.parse(localStorage.getItem('fin_cfg')||'{}')}catch(e){CFG={}}
- if(!CFG.tok){migrar();go('Resumen');return}
+ if(!CFG.tok&&!CFG.sync){migrar();go('Resumen');return}
  $('#nav').innerHTML='';$('#v').innerHTML='<section><h2>🔒 Datos cifrados</h2><div class="f"><input type="password" id="pwl" placeholder="Contraseña"><button class="p" data-a="unlock">Entrar</button></div><p id="msg2"></p></section>';const e=$('#pwl');if(e)e.focus()}
 arranque();
