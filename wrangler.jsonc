@@ -3,11 +3,19 @@
   "name": "balance",
   "main": "./_worker.js",
   "compatibility_date": "2026-11-10",
+  "keep_vars": true,
   "assets": {
     "directory": "./",
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "balance-db",
+      "database_id": "268768c9-8330-4ab5-b18a-f53d902fedae"
+    }
+  ],
   "observability": {
     "enabled": true
   }
