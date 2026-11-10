@@ -173,6 +173,11 @@ async function derivar(pw,salt){const m=await crypto.subtle.importKey('raw',new 
 async function nuevaClave(pw){VAULT.salt=crypto.getRandomValues(new Uint8Array(16));VAULT.key=await derivar(pw,VAULT.salt);VAULT.pw=pw}
 async function cifrar(){const iv=crypto.getRandomValues(new Uint8Array(12)),c=await crypto.subtle.encrypt({name:'AES-GCM',iv},VAULT.key,new TextEncoder().encode(JSON.stringify(S)));return JSON.stringify({s:b64(VAULT.salt),i:b64(iv),c:b64(new Uint8Array(c)),t:Date.now()})}
 async function abrir(txt,pw){const o=JSON.parse(txt),salt=ub(o.s),key=await derivar(pw,salt),p=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(o.i)},key,ub(o.c));VAULT.key=key;VAULT.salt=salt;VAULT.t=o.t;VAULT.pw=pw;return JSON.parse(new TextDecoder().decode(p))}
+const DBKEY='balance-vault',DBSTORE='keys';
+function abrirDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DBKEY,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(DBSTORE))r.result.createObjectStore(DBSTORE)};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+async function guardarClave(){if(!VAULT.key)return;let db;try{db=await abrirDB();await new Promise((resolve,reject)=>{const tx=db.transaction(DBSTORE,'readwrite');tx.objectStore(DBSTORE).put(VAULT.key,'principal');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}catch(e){console.warn('No se pudo recordar el desbloqueo',e)}finally{if(db)db.close()}}
+async function leerClave(){let db;try{db=await abrirDB();return await new Promise((resolve,reject)=>{const tx=db.transaction(DBSTORE,'readonly'),r=tx.objectStore(DBSTORE).get('principal');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}catch(e){return null}finally{if(db)db.close()}}
+async function abrirConClave(txt,key){const o=JSON.parse(txt),salt=ub(o.s),p=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(o.i)},key,ub(o.c));VAULT.key=key;VAULT.salt=salt;VAULT.t=o.t;return JSON.parse(new TextDecoder().decode(p))}
 async function remoto(){const r=await fetch('/api/datos');if(r.status===204)return null;if(r.status===401)throw new Error('Token incorrecto');if(!r.ok)throw new Error('Error '+r.status);return r.text()}
 function volcar(){clearTimeout(vt);vt=setTimeout(sube,400)}
 async function sube(){if(busy){again=1;return}busy=1;
@@ -184,19 +189,22 @@ async function recargar(){try{const t=await remoto();if(t){S=await abrir(t,VAULT
 async function desbloquear(pw){const m=t=>{const e=$('#msg2');if(e)e.textContent=t};if(!pw)return m('Escribe la contraseña');m('Descifrando…');
  try{let txt=null,off=0;try{txt=await remoto()}catch(e){if(e.message==='Token incorrecto')throw e;off=1;txt=localStorage.getItem('fin_blob')}
   if(txt)S=await abrir(txt,pw);else{await nuevaClave(pw);try{const l=JSON.parse(localStorage.getItem(K)||'null');if(l)S=l}catch(e){}}
-  migrar();go('Resumen');est(off?'⚠ Sin conexión (copia local)':'☁ Sincronizado');if(!txt)sube()}
+  await guardarClave();migrar();go('Resumen');est(off?'⚠ Sin conexión (copia local)':'☁ Sincronizado');if(!txt)sube()}
  catch(e){VAULT.key=null;m(e.name==='OperationError'?'Contraseña incorrecta':'No se pudo: '+e.message)}}
 async function activar(){const m=t=>{const e=$('#msgA');if(e)e.textContent=t},a=$('#pw1').value;
  if(!window.crypto||!crypto.subtle)return m('El cifrado solo funciona abriendo la app por https (tu página de Cloudflare) o en localhost.');
  if(!a)return m('Falta la contraseña');if(a!==$('#pw2').value)return m('Las contraseñas no coinciden');if(a.length<8)return m('Usa al menos 8 caracteres');
  CFG={sync:true};m('Comprobando…');
  try{const txt=await remoto();if(txt){if(!confirm('Ya hay datos guardados en la nube. ¿Cargarlos aquí? Se sustituirán los datos de este dispositivo.')){CFG={};return m('')}S=await abrir(txt,a)}else await nuevaClave(a);
-  localStorage.setItem('fin_cfg',JSON.stringify(CFG));migrar();await sube();if(VAULT.t)localStorage.removeItem(K);go('Ajustes')}
+  localStorage.setItem('fin_cfg',JSON.stringify(CFG));await guardarClave();migrar();await sube();if(VAULT.t)localStorage.removeItem(K);go('Ajustes')}
  catch(e){CFG={};VAULT.key=null;m(e.name==='OperationError'?'Esa contraseña no corresponde a los datos que hay en la nube':'No se pudo: '+e.message)}}
 function ajustes(){const ok=VAULT.key;$('#v').innerHTML=ok?`<section><h2>Sincronización</h2><p>Los datos se cifran en este dispositivo y en la nube solo hay un bloque ilegible. Estado: <b>${($('#est')||{}).textContent||''}</b></p><div class="f"><button data-a="subir">Sincronizar ahora</button><button data-a="bloq">Bloquear</button></div><p style="color:var(--m)">Si pierdes la contraseña, los datos no se pueden recuperar. «Exportar copia» (en Resumen) genera un archivo sin cifrar.</p></section>`
  :`<section><h2>Sincronización y cifrado</h2><p style="color:var(--m)">Introduce una contraseña de cifrado (mínimo 8 caracteres). Será la misma en todos tus dispositivos. Los datos se cifran antes de enviarse a la nube.</p><div class="f"><input type="password" id="pw1" placeholder="Contraseña de cifrado (mín. 8)"><input type="password" id="pw2" placeholder="Repite la contraseña"></div><div class="f"><button class="p" data-a="sync">Activar</button></div><p id="msgA"></p></section>`}
 document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(e.target.id==='q'){e.preventDefault();buscarAct()}else if(e.target.id==='pwl'){e.preventDefault();desbloquear(e.target.value)}});
-function arranque(){try{CFG=JSON.parse(localStorage.getItem('fin_cfg')||'{}')}catch(e){CFG={}}
+function pantallaBloqueo(){ $('#nav').innerHTML='';$('#v').innerHTML='<section><h2>🔒 Datos cifrados</h2><div class="f"><input type="password" id="pwl" placeholder="Contraseña"><button class="p" data-a="unlock">Entrar</button></div><p id="msg2"></p></section>';const e=$('#pwl');if(e)e.focus()}
+async function arranque(){try{CFG=JSON.parse(localStorage.getItem('fin_cfg')||'{}')}catch(e){CFG={}}
  if(!CFG.tok&&!CFG.sync){migrar();go('Resumen');return}
- $('#nav').innerHTML='';$('#v').innerHTML='<section><h2>🔒 Datos cifrados</h2><div class="f"><input type="password" id="pwl" placeholder="Contraseña"><button class="p" data-a="unlock">Entrar</button></div><p id="msg2"></p></section>';const e=$('#pwl');if(e)e.focus()}
+ $('#nav').innerHTML='';$('#v').innerHTML='<section><h2>🔒 Recuperando acceso…</h2><p>Comprobando este dispositivo.</p></section>';
+ if(CFG.sync){try{const key=await leerClave();if(key){VAULT.key=key;let txt=null,off=false;try{txt=await remoto()}catch(e){off=true;txt=localStorage.getItem('fin_blob')}if(!txt)txt=localStorage.getItem('fin_blob');if(txt){S=await abrirConClave(txt,key);migrar();go('Resumen');est(off?'⚠ Sin conexión (copia local)':'☁ Sincronizado');return}}}catch(e){VAULT.key=null}}
+ pantallaBloqueo()}
 arranque();
