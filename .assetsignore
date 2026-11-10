@@ -1,0 +1,9 @@
+# Worker backend and Wrangler configuration must not be published as public files
+_worker.js
+wrangler.jsonc
+servidor.py
+README.md
+.assetsignore
+.gitignore
+.github/
+.git/
