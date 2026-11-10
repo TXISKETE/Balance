@@ -34,10 +34,11 @@ function resumen(){
  <section class="s12"><h2>Activos por cartera</h2><div class="gt">
  <div class="gr h"><span></span><span>Invertido</span><span>Valor actual</span><span>Beneficio</span><span>% beneficio</span></div>
  ${S.carteras.map(c=>{const as=F.filter(x=>x.f.cartera===c.n),n=as.reduce((t,x)=>t+x.n,0),v=as.reduce((t,x)=>t+x.v,0);
-  return`<details class="rc" ${dop('r:'+c.n)}><summary class="gr"><span><b>${c.n}</b> <small style="color:var(--m)">(${P(v,fv)})</small></span><span>${eur(n)}</span><span>${eur(v)}</span>${bs(n,v)}</summary>${as.map(x=>`<div class="gr in"><span>${x.f.n} <small style="color:var(--m)">(${P(x.v,fv)})</small></span><span>${eur(x.n)}</span><span>${eur(x.v)}</span>${bs(x.n,x.v)}</div>`).join('')||'<div class="gr in"><span>Sin activos</span></div>'}</details>`}).join('')}
+  const gv=t=>{const z=as.filter(x=>(x.f.tipo||'V')===t);return{n:z.reduce((q,x)=>q+x.n,0),v:z.reduce((q,x)=>q+x.v,0)}},rvC=gv('V'),rfC=gv('F');
+  return`<details class="rc" ${dop('r:'+c.n)}><summary class="gr"><span><b>${c.n}</b> <small style="color:var(--m)">(${P(v,fv)})</small></span><span>${eur(n)}</span><span>${eur(v)}</span>${bs(n,v)}</summary>${as.map(x=>`<div class="gr in"><span>${x.f.n} <small style="color:var(--m)">(${P(x.v,fv)})</small></span><span>${eur(x.n)}</span><span>${eur(x.v)}</span>${bs(x.n,x.v)}</div>`).join('')||'<div class="gr in"><span>Sin activos</span></div>'}
+  <div class="gr in"><span><b>Renta variable</b></span><span>${eur(rvC.n)}</span><span>${eur(rvC.v)}</span>${bs(rvC.n,rvC.v)}</div>
+  <div class="gr in"><span><b>Renta fija</b></span><span>${eur(rfC.n)}</span><span>${eur(rfC.v)}</span>${bs(rfC.n,rfC.v)}</div></details>`}).join('')}
  <div class="gr tot"><span>Total activos</span><span>${eur(rv.n+rf.n)}</span><span>${eur(fv)}</span>${bs(rv.n+rf.n,fv)}</div>
- <div class="gr"><span>Renta variable (${P(rv.v,fv)})</span><span>${eur(rv.n)}</span><span>${eur(rv.v)}</span>${bs(rv.n,rv.v)}</div>
- <div class="gr"><span>Renta fija (${P(rf.v,fv)})</span><span>${eur(rf.n)}</span><span>${eur(rf.v)}</span>${bs(rf.n,rf.v)}</div>
  <div class="gr"><span>Comisiones pagadas</span><span></span><span></span><span class="ko">${eur(com)}</span><span></span></div></div></section></div>
  <section><div class="f"><button data-a="exp">Exportar copia</button><button data-a="imp">Importar copia</button></div></section>`}
 const nt=t=>`<td style="text-align:left;color:var(--m);white-space:normal">${t||''}</td>`;
@@ -80,9 +81,10 @@ function intereses(){
  monthStats=(b,m)=>{const amount=rec.filter(r=>r.banco===b&&r.fecha.slice(0,7)===m).reduce((a,x)=>a+x.importe,0),base=balanceAt(b,monthEnd(m));return{amount,base,rate:base!==null&&base!==0?amount/base*100:null}},
  stats=b=>months.map(m=>monthStats(b,m)),
  interestFor=b=>rec.filter(r=>r.banco===b).reduce((a,x)=>a+x.importe,0),
- rateFor=b=>{const z=stats(b);return z.some(x=>x.rate!==null)?z.reduce((a,x)=>a+(x.rate||0),0):null},
+ compound=z=>{const valid=z.filter(x=>x!==null&&Number.isFinite(x));return valid.length?(valid.reduce((f,x)=>f*(1+x/100),1)-1)*100:null},
+ rateFor=b=>compound(stats(b).map(x=>x.rate)),
  total=rec.reduce((a,x)=>a+x.importe,0),
- totalRate=months.reduce((sum,m)=>{const rows=banks.map(b=>monthStats(b,m)).filter(x=>x.base!==null),base=rows.reduce((a,x)=>a+x.base,0),amount=rows.reduce((a,x)=>a+x.amount,0);return sum+(base?amount/base*100:0)},0),
+ totalRate=compound(months.map(m=>{const rows=banks.map(b=>monthStats(b,m)).filter(x=>x.base!==null&&x.base!==0),base=rows.reduce((a,x)=>a+x.base,0),amount=rows.reduce((a,x)=>a+x.amount,0);return base?amount/base*100:null})),
  card=(name,v,p,detail)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(p===null?'Sin balance mensual disponible': 'Rentabilidad acumulada del periodo: '+p.toFixed(2)+'%'+(detail?' · '+detail:''))+'</small></div>',
  cards='<div class="stat-grid">'+card('Intereses totales',total,totalRate,'suma de rentabilidades mensuales')+banks.map(b=>card(b,interestFor(b),rateFor(b),'calculada mes a mes')).join('')+'</div>',
  opts=[['ytd','Este año'],['1','Último mes'],['3','Últimos 3 meses'],['6','Últimos 6 meses'],['12','Últimos 12 meses'],['all','Todo el histórico']],
@@ -137,7 +139,7 @@ function inversiones(){
  <details ${dop('p:'+f.n+'|'+f.cartera)}><summary>Aportaciones (${f.ap.length})</summary><table>${ord(f.ap).map(a=>`<tr><td>${fes(a.fecha)}</td><td>${a.vl}</td><td>${a.part}</td><td>${eur(a.vl*a.part)}</td>${nt(a.nota)}<td><button data-a="delap" data-i="${i}" data-j="${a.j}">✕</button></td></tr>`).join('')}</table></details>
  <details ${dop('h:'+f.n+'|'+f.cartera)}><summary>Historial de precios (${f.hist.length})</summary><table>${ord(f.hist).map(h=>`<tr><td>${fes(h.fecha)}</td><td>${h.vl}</td></tr>`).join('')}</table></details></details>`};
  const cart=(c,ci)=>{const as=S.fondos.map((f,i)=>i).filter(i=>S.fondos[i].cartera===c.n),n=as.reduce((t,i)=>t+inv(S.fondos[i]),0),v=as.reduce((t,i)=>t+parts(S.fondos[i])*S.fondos[i].vl,0),cm=c.com.reduce((t,x)=>t+x.importe,0);
- return`<section><details class="cart" ${dop('c:'+c.n,1)}><summary><h2 style="display:inline;margin:0">Cartera: ${c.n}</h2><span>${eur(v)} · <span class="${v>=n?'ok':'ko'}">${eur(v-n)} (${pct(v,n)})</span></span></summary><div class="g" style="margin-top:12px">${kp('Invertido',eur(n))}${kp('Valor actual',eur(v))}${kp('Beneficio',eur(v-n)+' · '+pct(v,n),v>=n?'ok':'ko')}${kp('Comisiones',eur(cm))}${kp('Resultado tras comisiones',eur(v-n-cm),v-n-cm>=0?'ok':'ko')}</div>
+ return`<section><details class="cart" ${dop('c:'+c.n)}><summary><h2 style="display:inline;margin:0">Cartera: ${c.n}</h2><span>${eur(v)} · <span class="${v>=n?'ok':'ko'}">${eur(v-n)} (${pct(v,n)})</span></span></summary><div class="g" style="margin-top:12px">${kp('Invertido',eur(n))}${kp('Valor actual',eur(v))}${kp('Beneficio',eur(v-n)+' · '+pct(v,n),v>=n?'ok':'ko')}${kp('Comisiones',eur(cm))}${kp('Resultado tras comisiones',eur(v-n-cm),v-n-cm>=0?'ok':'ko')}</div>
  <div class="f"><button data-a="delcart" data-c="${ci}">Eliminar cartera</button></div>
  <details ${dop('m:'+c.n)}><summary>Comisiones de la cartera (${c.com.length}) · ${eur(cm)}</summary><div class="f"><input type="date" id="cd${ci}" value="${hoy()}"><input type="number" step="0.01" id="cm${ci}" placeholder="Importe €"><input id="cn${ci}" placeholder="Comentario (ej. comisión anual)"><button class="p" data-a="com" data-c="${ci}">Añadir comisión</button></div><table>${ord(c.com).map(x=>`<tr><td>${fes(x.fecha)}</td><td>${eur(x.importe)}</td>${nt(x.nota)}<td><button data-a="delcom" data-c="${ci}" data-j="${x.j}">✕</button></td></tr>`).join('')}</table></details>
  ${as.map(act).join('')||'<p>Sin activos todavía.</p>'}</details></section>`};
@@ -162,12 +164,12 @@ function migrar(){S.fondos=S.fondos||[];S.carteras=S.carteras||[];if(!S.carteras
  S.fondos.forEach(f=>{if(!f.cartera||!S.carteras.some(c=>c.n===f.cartera))f.cartera=S.carteras[0].n;if(f.isin&&!f.fuente){f.fuente='ft';f.ext=f.isin}f.clase=f.clase||'fondo';f.hist=f.hist||[];
   if(f.com&&f.com.length){const c=S.carteras.find(c=>c.n===f.cartera);f.com.forEach(x=>c.com.push({...x,nota:f.n+(x.nota?': '+x.nota:'')}))}delete f.com});ordenar()}
 function setVl(f,v,fecha,orig,tc){v=Math.round(v*1e6)/1e6;f.vl=v;if(orig!==undefined){f.vlo=orig;f.tc=tc}f.hist=f.hist||[];const d=fecha||hoy();f.fp=d;f.fpd=fecha?1:0;const h=f.hist.find(x=>x.fecha===d);h?h.vl=v:f.hist.push({fecha:d,vl:v})}
-async function api(u){const r=await fetch(u);let d;try{d=await r.json()}catch(e){throw new Error('el servidor no es servidor.py; páralo (Ctrl+C) y ejecuta: python servidor.py')}if(!r.ok)throw new Error(d.error||'Error');return d}
+async function api(u){const r=await fetch(u);let d;try{d=await r.json()}catch(e){throw new Error('el servidor no es servidor.py; páralo (Ctrl+C) y ejecuta: python servidor.py')}if(!r.ok)throw new Error(d.error||'HTTP '+r.status);return d}
 const msg=t=>{const m=$('#msg');if(m)m.textContent=t};
 async function buscarAct(){const q=$('#q').value.trim();if(!q)return;msg('Buscando…');try{const d=await api('/api/buscar?q='+encodeURIComponent(q));RES=d.r;$('#res').innerHTML=resHTML();msg((RES.length?'':'Sin resultados. ')+(d.avisos.length?'Avisos: '+d.avisos.join(' · '):''))}catch(e){msg('No se pudo: '+e.message)}}
 async function anadir(j){const r=RES[j],c=$('#cart').value;if(S.fondos.some(f=>f.fuente===r.fuente&&f.ext===r.id&&f.cartera===c))return msg('Ya está en esa cartera');msg('Añadiendo…');
  try{const d=await api('/api/precio?fuente='+r.fuente+'&id='+encodeURIComponent(r.id)),f={n:r.nombre,clase:r.clase,fuente:r.fuente,ext:r.id,cartera:c,moneda:d.moneda,tipo:/bond|treasury|government|fixed income|corporate|aggregate/i.test(r.nombre)?'F':'V',vl:0,ap:[],hist:[]};setVl(f,d.precio,d.fecha,d.orig,d.tc);S.fondos.push(f);RES=[];save();go('Inversiones');msg('Añadido: '+r.nombre)}catch(e){msg('No se pudo: '+e.message)}}
-async function actualizar(){msg('Actualizando…');let ok=0,ko=0;for(const f of S.fondos.filter(f=>f.fuente)){try{const d=await api('/api/precio?fuente='+f.fuente+'&id='+encodeURIComponent(f.ext));setVl(f,d.precio,d.fecha,d.orig,d.tc);f.moneda=d.moneda;ok++}catch(e){ko++}}save();go('Inversiones');msg(ok+' actualizados, '+ko+' con error')}
+async function actualizar(){msg('Actualizando precios…');let ok=0,errores=[];for(const f of S.fondos.filter(f=>f.fuente)){try{const d=await api('/api/precio?fuente='+f.fuente+'&id='+encodeURIComponent(f.ext));setVl(f,d.precio,d.fecha,d.orig,d.tc);f.moneda=d.moneda;ok++}catch(e){errores.push({nombre:f.n,fuente:f.fuente,id:f.ext,error:e.message||String(e)})}}save();go('Inversiones');const resumen=errores.length?ok+' actualizados; '+errores.length+' con error:\\n'+errores.map(x=>'• '+x.nombre+' ('+x.fuente+': '+x.id+'): '+x.error).join('\\n'):'Todos los precios actualizados correctamente ('+ok+').';msg(resumen)}
 document.addEventListener('click',e=>{const t=e.target,a=t.dataset.a,i=+t.dataset.i;
  if(t.dataset.tab)return go(t.dataset.tab);if(!a)return;
  if(a==='banco'){const n=(prompt('Nombre del banco')||'').trim();if(n&&!S.bancos.includes(n))S.bancos.push(n)}
@@ -209,14 +211,14 @@ function abrirDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(
 async function guardarClave(){if(!VAULT.key)return;let db;try{db=await abrirDB();await new Promise((resolve,reject)=>{const tx=db.transaction(DBSTORE,'readwrite');tx.objectStore(DBSTORE).put(VAULT.key,'principal');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}catch(e){console.warn('No se pudo recordar el desbloqueo',e)}finally{if(db)db.close()}}
 async function leerClave(){let db;try{db=await abrirDB();return await new Promise((resolve,reject)=>{const tx=db.transaction(DBSTORE,'readonly'),r=tx.objectStore(DBSTORE).get('principal');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}catch(e){return null}finally{if(db)db.close()}}
 async function abrirConClave(txt,key){const o=JSON.parse(txt),salt=ub(o.s),p=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub(o.i)},key,ub(o.c));VAULT.key=key;VAULT.salt=salt;VAULT.t=o.t;return JSON.parse(new TextDecoder().decode(p))}
-async function remoto(){const r=await fetch('/api/datos');if(r.status===204)return null;if(r.status===401)throw new Error('Token incorrecto');if(!r.ok)throw new Error('Error '+r.status);return r.text()}
+async function remoto(){let r;try{r=await fetch('/api/datos')}catch(e){throw new Error('No se pudo conectar con Cloudflare en /api/datos. Comprueba la conexión a Internet y que el Worker esté disponible ('+(e.message||'error de red')+').')}if(r.status===204)return null;if(!r.ok){let detalle='';try{const j=await r.clone().json();detalle=j.error||j.message||''}catch(e){try{detalle=(await r.text()).slice(0,240)}catch(x){}}throw new Error('HTTP '+r.status+(detalle?' — '+detalle:'')+'. Revisa el despliegue del Worker y la configuración D1.')}return r.text()}
 function volcar(){clearTimeout(vt);vt=setTimeout(sube,400)}
 async function sube(){if(busy){again=1;return}busy=1;
  try{const b=await cifrar();try{localStorage.setItem('fin_blob',b)}catch(e){}est('Guardando…');const r=await fetch('/api/datos',{method:'PUT',headers:{'X-Base':String(VAULT.t||0)},body:b});
   if(r.status===409){busy=0;alert('Los datos se cambiaron en otro dispositivo. Se cargará la versión más reciente.');await recargar();return}
-  if(!r.ok)throw new Error(r.status);VAULT.t=JSON.parse(b).t;est('☁ Sincronizado')}catch(e){est('⚠ Sin sincronizar')}
+  if(!r.ok)throw new Error(r.status);VAULT.t=JSON.parse(b).t;est('☁ Sincronizado')}catch(e){est('⚠ No se pudo sincronizar: '+(e.message||String(e))+' · Comprueba conexión y Worker')}
  busy=0;if(again){again=0;sube()}}
-async function recargar(){try{const t=await remoto();if(t){S=await abrir(t,VAULT.pw);migrar();est('☁ Sincronizado');go(tab)}}catch(e){est('⚠ No se pudo recargar')}}
+async function recargar(){try{const t=await remoto();if(t){try{S=await abrir(t,VAULT.pw)}catch(e){throw new Error(e.name==='OperationError'?'No se pudo descifrar la copia remota: la clave de este dispositivo no coincide. Vuelve a desbloquear con tu contraseña.':e.message)}migrar();est('☁ Sincronizado');go(tab)}else est('No hay datos guardados en la nube todavía.')}catch(e){est('⚠ Recarga fallida: '+e.message)}}
 async function desbloquear(pw){const m=t=>{const e=$('#msg2');if(e)e.textContent=t};if(!pw)return m('Escribe la contraseña');m('Descifrando…');
  try{let txt=null,off=0;try{txt=await remoto()}catch(e){if(e.message==='Token incorrecto')throw e;off=1;txt=localStorage.getItem('fin_blob')}
   if(txt)S=await abrir(txt,pw);else{await nuevaClave(pw);try{const l=JSON.parse(localStorage.getItem(K)||'null');if(l)S=l}catch(e){}}
