@@ -58,7 +58,7 @@ function evol(k,vl){
 function registroDialog(k,l){const q=S.bancos.includes(SEL.b)?SEL.b:S.bancos[0];return`<dialog class="modal" id="regdlg"><form method="dialog" class="modal-card"><button class="modal-x" type="submit" formnovalidate value="cancel" aria-label="Cerrar">×</button><h2>Nueva aportación</h2><label>Cuenta / banco<select id="b" data-a="selb">${(S.bancos.length?'':'<option value="">Selecciona banco…</option>')+S.bancos.map(b=>`<option${b===q?' selected':''}>${b}</option>`).join('')}<option value="__n">＋ Nuevo banco…</option></select></label><label>Fecha<input type="date" id="d" value="${hoy()}" required></label><label>Importe (€)<input type="number" step="0.01" id="m" placeholder="${l}" required></label><label>Comentario<input id="n" placeholder="Opcional"></label><div class="modal-actions"><button type="submit" formnovalidate value="cancel">Cancelar</button><button class="p" type="button" data-a="add" data-k="${k}">Guardar aportación</button></div></form></dialog>`}
 function balanceStats(k){
  const rs=S[k],banks=S.bancos.filter(b=>rs.some(r=>r.banco===b)),
- months=[...new Set(rs.map(r=>(r.fecha||'').slice(0,7)).filter(m=>/^\\d{4}-\\d{2}$/.test(m)))].sort(),
+ months=[...new Set(rs.map(r=>(r.fecha||'').slice(0,7)).filter(m=>m.length===7&&m[4]==='-'))].sort(),
  currentKey=months.length?months[months.length-1]:null,
  d=currentKey?new Date(Number(currentKey.slice(0,4)),Number(currentKey.slice(5,7))-1,1):null,
  previousKey=d?new Date(d.getFullYear(),d.getMonth()-1,1).getFullYear()+'-'+String(new Date(d.getFullYear(),d.getMonth()-1,1).getMonth()+1).padStart(2,'0'):null,
