@@ -71,26 +71,26 @@ function balanceStats(k){
 function registro(k,l){$('#v').innerHTML=formReg(k,l)+balanceStats(k)+`<details class="fold"><summary>Ver evolución</summary>${evol(k,k==='deudas'?'Variación (cuota)':'Variación')}</details><details class="fold"><summary>Ver registros anteriores (${S[k].length})</summary>${listaReg(k)}</details>`+registroDialog(k,l)}
 
 function intereses(){
- const end=hoy(),period=FI.periodo||'ytd',
- startFor=v=>{const d=new Date();if(v==='ytd')return d.getFullYear()+'-01-01';if(v==='all')return S.intereses.map(x=>x.fecha).sort()[0]||end;d.setMonth(d.getMonth()-Number(v));return d.toISOString().slice(0,10)},
- start=startFor(period),rec=S.intereses.filter(r=>r.fecha>=start&&r.fecha<=end&&(!FI.banco||r.banco===FI.banco)),
- banks=S.bancos.filter(b=>!FI.banco||b===FI.banco),
- balanceAt=(b,day)=>{const a=S.saldos.filter(x=>x.banco===b&&x.fecha<=day).sort((x,y)=>x.fecha<y.fecha?-1:1);return a.length?a[a.length-1].importe:null},
+ const endDate=hoy(),period=FI.periodo||'ytd',
+ startFor=v=>{const d=new Date();if(v==='ytd')return d.getFullYear()+'-01-01';if(v==='all')return S.intereses.map(x=>x.fecha).sort()[0]||endDate;d.setMonth(d.getMonth()-Number(v));return d.toISOString().slice(0,10)},
+ start=startFor(period),rec=S.intereses.filter(r=>r.fecha>=start&&r.fecha<=endDate&&(!FI.banco||r.banco===FI.banco)),
+ allBanks=S.bancos.filter(b=>!FI.banco||b===FI.banco),
+ balanceBefore=(b,day)=>{const x=S.saldos.filter(r=>r.banco===b&&r.fecha<day).sort((p,q)=>p.fecha<q.fecha?-1:1);return x.length?x[x.length-1].importe:null},
  months=[...new Set(rec.map(r=>r.fecha.slice(0,7)))].sort(),
- monthEnd=m=>{const[y,n]=m.split('-').map(Number);return y+'-'+String(n).padStart(2,'0')+'-'+String(new Date(y,n,0).getDate()).padStart(2,'0')},
- monthStats=(b,m)=>{const amount=rec.filter(r=>r.banco===b&&r.fecha.slice(0,7)===m).reduce((a,x)=>a+x.importe,0),base=balanceAt(b,monthEnd(m));return{amount,base,rate:base!==null&&base!==0?amount/base*100:null}},
- stats=b=>months.map(m=>monthStats(b,m)),
- interestFor=b=>rec.filter(r=>r.banco===b).reduce((a,x)=>a+x.importe,0),
+ monthStats=(b,m)=>{const rows=rec.filter(r=>r.banco===b&&r.fecha.slice(0,7)===m).sort((x,y)=>x.fecha<y.fecha?-1:1),amount=rows.reduce((n,x)=>n+x.importe,0),base=rows.length?balanceBefore(b,rows[0].fecha):null;return{amount,base,rate:base!==null&&base>0?amount/base*100:null}},
  compound=z=>{const valid=z.filter(x=>x!==null&&Number.isFinite(x));return valid.length?(valid.reduce((f,x)=>f*(1+x/100),1)-1)*100:null},
- rateFor=b=>compound(stats(b).filter(x=>x.amount>0).map(x=>x.rate)),
- total=rec.reduce((a,x)=>a+x.importe,0),
- totalRate=compound(months.map(m=>{const rows=banks.map(b=>monthStats(b,m)).filter(x=>x.amount>0&&x.base!==null&&x.base!==0),base=rows.reduce((a,x)=>a+x.base,0),amount=rows.reduce((a,x)=>a+x.amount,0);return base?amount/base*100:null})),
- card=(name,v,p,detail)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(p===null?'Sin balance mensual disponible': 'Rentabilidad acumulada del periodo: '+p.toFixed(2)+'%'+(detail?' · '+detail:''))+'</small></div>',
- cards='<div class="stat-grid">'+card('Intereses totales',total,totalRate,'suma de rentabilidades mensuales')+banks.map(b=>card(b,interestFor(b),rateFor(b),'capitalización compuesta mes a mes')).join('')+'</div>',
+ interestFor=b=>rec.filter(r=>r.banco===b).reduce((n,x)=>n+x.importe,0),
+ active=allBanks.map(b=>({b,amount:interestFor(b),rate:compound(months.map(m=>monthStats(b,m)).filter(x=>x.amount>0).map(x=>x.rate))})).filter(x=>x.amount>0).sort((x,y)=>y.amount-x.amount),
+ banks=active.map(x=>x.b),
+ total=rec.reduce((n,x)=>n+x.importe,0),
+ totalRate=compound(months.map(m=>{const rows=banks.map(b=>monthStats(b,m)).filter(x=>x.amount>0&&x.base!==null&&x.base>0),base=rows.reduce((n,x)=>n+x.base,0),amount=rows.reduce((n,x)=>n+x.amount,0);return base?amount/base*100:null})),
+ card=(name,v,p,detail,hero=false)=>'<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(p===null?'Sin saldo anterior al abono': 'Rentabilidad compuesta del periodo: '+p.toFixed(2)+'%'+(detail?' · '+detail:''))+'</small></div>',
  opts=[['ytd','Este año'],['1','Último mes'],['3','Últimos 3 meses'],['6','Últimos 6 meses'],['12','Últimos 12 meses'],['all','Todo el histórico']],
- R=months.map(m=>{const v=banks.map(b=>monthStats(b,m).amount);return{l:fm(m),v,t:v.reduce((a,b)=>a+b,0)}}),
- rateRows=months.map(m=>{const z=banks.map(b=>monthStats(b,m)).filter(x=>x.amount>0&&x.base!==null&&x.base!==0),base=z.reduce((a,x)=>a+x.base,0),amount=z.reduce((a,x)=>a+x.amount,0);return{m,rate:base?amount/base*100:null}});
- $('#v').innerHTML=formReg('intereses','Interés')+cards+`<div class="f period-filters"><label>Periodo de cálculo ${selH('fi','periodo',opts,period)}</label><label>Banco ${selH('fi','banco',[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FI.banco)}</label></div><details class="fold"><summary>Ver desglose de intereses</summary><section><h2>Intereses recibidos por mes</h2><div style="max-height:320px;overflow:auto"><table><tr><td><b>Mes</b></td>${banks.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td><td><b>Rentabilidad mensual</b></td></tr>${R.map((x,i)=>`<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td><td>${rateRows[i].rate===null?'—':rateRows[i].rate.toFixed(2)+'%'}</td></tr>`).join('')}</table></div>${barras(R,banks)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés');
+ filters='<div class="f period-filters"><label>Periodo de cálculo '+selH('fi','periodo',opts,period)+'</label><label>Banco '+selH('fi','banco',[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FI.banco)+'</label></div>',
+ cards='<div class="stat-grid">'+card('Intereses totales',total,totalRate,'suma de rentabilidades mensuales',true)+active.map(x=>card(x.b,x.amount,x.rate,'intereses cobrados')).join('')+'</div>',
+ R=months.map(m=>{const v=banks.map(b=>monthStats(b,m).amount);return{l:fm(m),v,t:v.reduce((x,y)=>x+y,0)}}),
+ rateRows=months.map(m=>{const z=banks.map(b=>monthStats(b,m)).filter(x=>x.amount>0&&x.base!==null&&x.base>0),base=z.reduce((n,x)=>n+x.base,0),amount=z.reduce((n,x)=>n+x.amount,0);return{m,rate:base?amount/base*100:null}});
+ $('#v').innerHTML=formReg('intereses','Interés')+filters+cards+`<details class="fold"><summary>Ver desglose de intereses</summary><section><h2>Intereses recibidos por mes</h2><div style="max-height:320px;overflow:auto"><table><tr><td><b>Mes</b></td>${banks.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td><td><b>Rentabilidad mensual</b></td></tr>${R.map((x,i)=>`<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td><td>${rateRows[i].rate===null?'—':rateRows[i].rate.toFixed(2)+'%'}</td></tr>`).join('')}</table></div>${barras(R,banks)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés');
 }
 
 const fm=k=>{const[y,m]=k.split('-');return['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][m-1]+'-'+y.slice(2)};
@@ -169,7 +169,22 @@ const msg=t=>{const m=$('#msg');if(m)m.textContent=t};
 async function buscarAct(){const q=$('#q').value.trim();if(!q)return;msg('Buscando…');try{const d=await api('/api/buscar?q='+encodeURIComponent(q));RES=d.r;$('#res').innerHTML=resHTML();msg((RES.length?'':'Sin resultados. ')+(d.avisos.length?'Avisos: '+d.avisos.join(' · '):''))}catch(e){msg('No se pudo: '+e.message)}}
 async function anadir(j){const r=RES[j],c=$('#cart').value;if(S.fondos.some(f=>f.fuente===r.fuente&&f.ext===r.id&&f.cartera===c))return msg('Ya está en esa cartera');msg('Añadiendo…');
  try{const d=await api('/api/precio?fuente='+r.fuente+'&id='+encodeURIComponent(r.id)),f={n:r.nombre,clase:r.clase,fuente:r.fuente,ext:r.id,cartera:c,moneda:d.moneda,tipo:/bond|treasury|government|fixed income|corporate|aggregate/i.test(r.nombre)?'F':'V',vl:0,ap:[],hist:[]};setVl(f,d.precio,d.fecha,d.orig,d.tc);S.fondos.push(f);RES=[];save();go('Inversiones');msg('Añadido: '+r.nombre)}catch(e){msg('No se pudo: '+e.message)}}
-async function actualizar(vista=tab){const activos=S.fondos.filter(f=>f.fuente);let ok=0,errores=[];for(let i=0;i<activos.length;i++){const f=activos[i];try{const d=await api('/api/precio?fuente='+f.fuente+'&id='+encodeURIComponent(f.ext));setVl(f,d.precio,d.fecha,d.orig,d.tc);f.moneda=d.moneda;ok++}catch(e){errores.push({nombre:f.n,fuente:f.fuente,id:f.ext,error:e.message||String(e)})}if(f.fuente==='coingecko'&&i<activos.length-1)await new Promise(r=>setTimeout(r,1300))}save();go(vista);const resumen=errores.length?ok+' actualizados; '+errores.length+' con error:\n'+errores.map(x=>'• '+x.nombre+' ('+x.fuente+': '+x.id+'): '+x.error).join('\n'):'Todos los precios actualizados correctamente ('+ok+').';alert(resumen)}
+async function actualizar(vista=tab){
+ const activos=S.fondos.filter(f=>f.fuente),dlg=document.createElement('dialog');
+ dlg.className='update-dialog';dlg.innerHTML='<h2>Actualizando precios</h2><p class="update-progress">Preparando consulta…</p><pre class="update-log"></pre><div class="f"><button type="button" class="update-close" disabled>Cerrar</button></div>';
+ document.body.appendChild(dlg);const progress=dlg.querySelector('.update-progress'),log=dlg.querySelector('.update-log'),close=dlg.querySelector('.update-close');
+ const add=t=>{log.textContent+=t+'\\n';log.scrollTop=log.scrollHeight};
+ close.addEventListener('click',()=>dlg.close());dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
+ let ok=0,errores=[];
+ progress.textContent='0 de '+activos.length+' activos actualizados';
+ for(let i=0;i<activos.length;i++){const f=activos[i];progress.textContent='Consultando '+(i+1)+' de '+activos.length+': '+f.n;
+  try{const d=await api('/api/precio?fuente='+f.fuente+'&id='+encodeURIComponent(f.ext));setVl(f,d.precio,d.fecha,d.orig,d.tc);f.moneda=d.moneda;ok++;add('✓ '+f.n+': '+d.precio+' '+(d.moneda||'')+' · fecha: '+(d.fecha||'no indicada'))}
+  catch(e){const error=e.message||String(e);errores.push({nombre:f.n,error});add('✕ '+f.n+': '+error)}
+  progress.textContent=(i+1)+' de '+activos.length+' · '+ok+' correctos · '+errores.length+' errores';
+  if(f.fuente==='coingecko'&&i<activos.length-1)await new Promise(r=>setTimeout(r,1800))
+ }
+ save();go(vista);dlg.querySelector('h2').textContent='Actualización terminada';progress.textContent=ok+' actualizados · '+errores.length+' errores';add(errores.length?'\nErrores:':'\nTodos los precios se han actualizado correctamente.');close.disabled=false;
+}
 document.addEventListener('click',e=>{const t=e.target,a=t.dataset.a,i=+t.dataset.i;
  if(t.dataset.tab)return go(t.dataset.tab);if(!a)return;
  if(a==='banco'){const n=(prompt('Nombre del banco')||'').trim();if(n&&!S.bancos.includes(n))S.bancos.push(n)}
