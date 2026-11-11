@@ -148,3 +148,17 @@ label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--m)}
 #v details.rc>.asset-row{margin-left:14px;border-left:2px solid var(--l);padding-left:12px}
 #v details.rc .ok{color:var(--ok)!important}#v details.rc .ko{color:var(--ko)!important}
 #v details.rc .ok small,#v details.rc .ko small{color:inherit!important}
+
+/* Tabla de aportaciones: columnas alineadas y anchos consistentes */
+#v table.contrib-table{width:100%;table-layout:fixed;border-collapse:collapse}
+#v table.contrib-table th,#v table.contrib-table td{box-sizing:border-box;padding:10px 8px;vertical-align:middle;white-space:nowrap}
+#v table.contrib-table th{font-size:.82rem;font-weight:700;text-align:right}
+#v table.contrib-table td{text-align:right;font-variant-numeric:tabular-nums}
+#v table.contrib-table th:first-child,#v table.contrib-table td:first-child{text-align:left;width:16%}
+#v table.contrib-table th:nth-child(2),#v table.contrib-table td:nth-child(2){width:20%}
+#v table.contrib-table th:nth-child(3),#v table.contrib-table td:nth-child(3){width:20%}
+#v table.contrib-table th:nth-child(4),#v table.contrib-table td:nth-child(4){width:18%}
+#v table.contrib-table th:nth-child(5),#v table.contrib-table td:nth-child(5){width:18%;text-align:left;white-space:normal}
+#v table.contrib-table th:last-child,#v table.contrib-table td:last-child{width:8%;text-align:center}
+#v table.contrib-table tbody tr+tr td{border-top:1px solid var(--l)}
+@media(max-width:700px){#v table.contrib-table{min-width:680px}}
