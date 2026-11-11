@@ -58,8 +58,9 @@ label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--m)}
 #est{display:inline-block;max-width:min(65vw,720px);white-space:normal;overflow-wrap:anywhere;vertical-align:middle;font-size:.78rem;line-height:1.25}
 #msg{white-space:pre-line;overflow-wrap:anywhere;color:var(--m);font-size:.88rem}
 
-.stat-card.hero{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-color:transparent;color:#fff}
+.stat-card.hero{background:linear-gradient(135deg,#6366f1,#8b5cf6);border:0;border-radius:18px;padding:16px;box-shadow:var(--sh);color:#fff}
 .stat-card.hero small,.stat-card.hero b{color:#fff}
+.stat-card.hero b{font-size:1.6rem}
 .update-dialog{width:min(94vw,460px);max-width:460px;max-height:80vh;border:0;padding:0;background:transparent;color:var(--t)}
 .update-dialog::backdrop{background:rgba(10,14,35,.58);backdrop-filter:blur(3px)}
 .update-dialog .update-card{max-height:80vh;overflow:auto}
