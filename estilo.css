@@ -166,3 +166,6 @@ label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--m)}
 /* En la tarjeta global lila, la variación conserva el color según su signo */
 .stat-card.hero small.ok{color:var(--ok)!important}
 .stat-card.hero small.ko{color:var(--ko)!important}
+
+.stat-card.hero small.ok{color:var(--ok)!important}
+.stat-card.hero small.ko{color:var(--ko)!important}
