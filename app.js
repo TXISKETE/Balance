@@ -60,9 +60,8 @@ function balanceStats(k){
  const rs=S[k],banks=S.bancos.filter(b=>rs.some(r=>r.banco===b)),
  today=hoy(),monthStart=today.slice(0,7)+'-01',
  prevEnd=new Date(today.slice(0,4),Number(today.slice(5,7))-1,0),prevEndKey=prevEnd.getFullYear()+'-'+String(prevEnd.getMonth()+1).padStart(2,'0')+'-'+String(prevEnd.getDate()).padStart(2,'0'),
- beforeEnd=new Date(prevEnd.getFullYear(),prevEnd.getMonth(),0),beforeEndKey=beforeEnd.getFullYear()+'-'+String(beforeEnd.getMonth()+1).padStart(2,'0')+'-'+String(beforeEnd.getDate()).padStart(2,'0'),
  at=(rows,date)=>{const x=rows.filter(r=>r.fecha<=date).sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0);return x.length?x[x.length-1].importe:null},
- rows=banks.map(b=>{const own=rs.filter(r=>r.banco===b),value=at(own,today),prev=at(own,prevEndKey),before=at(own,beforeEndKey);return{b,value:value===null?0:value,delta:prev!==null&&before!==null?prev-before:null,prev:before}});
+ rows=banks.map(b=>{const own=rs.filter(r=>r.banco===b),value=at(own,today),prev=at(own,prevEndKey);return{b,value:value===null?0:value,delta:value!==null&&prev!==null?value-prev:null,prev}});
  const value=rows.reduce((a,x)=>a+x.value,0),hasPrev=rows.length>0&&rows.every(x=>x.delta!==null),prev=hasPrev?rows.reduce((a,x)=>a+x.prev,0):null,delta=hasPrev?rows.reduce((a,x)=>a+x.delta,0):null;
  const card=(name,v,d,p,hero=false)=>'<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':(k==='deudas'?(d<=0?'ok':'ko'):(d>=0?'ok':'ko')))+'">'+(d===null?'Sin datos suficientes para comparar':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
  return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,delta,prev!==null&&prev!==0?delta/prev*100:null,true)+rows.map(x=>card(x.b,x.value,x.delta,x.prev!==null&&x.prev!==0?x.delta/x.prev*100:null)).join('')+'</div>';
