@@ -1,7 +1,7 @@
 // Cloudflare Pages (modo avanzado): sirve la app y ofrece /api/datos, /api/buscar y /api/precio
 const J=(o,s=200)=>new Response(JSON.stringify(o),{status:s,headers:{'content-type':'application/json','cache-control':'no-store'}});
 const UA={'user-agent':'Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0','accept-language':'en'};
-const get=async(u,txt)=>{const r=await fetch(u,{headers:UA});if(!r.ok)throw new Error('HTTP '+r.status+' en '+new URL(u).host);return txt?r.text():r.json()};
+const get=async(u,txt)=>{let r;for(let i=0;i<4;i++){r=await fetch(u,{headers:UA});if(r.ok)break;if(r.status!==429&&r.status<500)throw new Error('HTTP '+r.status+' en '+new URL(u).host);if(i===3)throw new Error('HTTP '+r.status+' en '+new URL(u).host+' (límite de peticiones; espera unos minutos y vuelve a actualizar)');const h=+(r.headers.get('retry-after')||0);await new Promise(ok=>setTimeout(ok,Math.max(h*1000,1000*2**i)))}return txt?r.text():r.json()};
 const MES={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 const fechaFT=h=>{const m=h.match(/as of\s+([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/i),k=m&&MES[m[1].toLowerCase()];return k?`${m[3]}-${String(k).padStart(2,'0')}-${m[2].padStart(2,'0')}`:''};
 const iso=t=>new Date(t*1000).toISOString().slice(0,10);
