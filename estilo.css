@@ -90,3 +90,21 @@ label{display:flex;flex-direction:column;gap:3px;font-size:.8rem;color:var(--m)}
 .update-dialog td{white-space:normal}
 .update-dialog td:first-child{text-align:left}
 .update-dialog td:not(:first-child){text-align:right}
+
+/* Ajuste de cabecera y desplegables integrados */
+#refreshSummary{font-size:.78rem!important;padding:5px 8px!important;border-radius:8px;line-height:1.2;vertical-align:middle}
+#updateStatus{width:19px;height:19px;font-size:.78rem;margin-left:3px;vertical-align:middle}
+#updateStatus.busy{border-width:2px}
+#v details>summary{list-style-position:inside!important;padding:15px 16px!important}
+#v details>summary::-webkit-details-marker{display:inline-block}
+#v details.fold{background:#1e2238;border:0;border-radius:16px;padding:0 0 12px;margin:12px 0;box-shadow:none;overflow:hidden}
+#v details.fold>summary{display:list-item;list-style-position:inside;background:#1e2238;color:var(--m);border:0;border-radius:16px;padding:15px 16px!important;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+#v details.fold[open]>summary{margin:0;padding-bottom:12px!important}
+#v details.fold>section,#v details.fold>.f,#v details.fold>div:not(summary){margin:0 12px 8px;background:var(--c);border-radius:12px;padding:12px}
+#v details.sub{background:var(--c);border:1px solid var(--l);border-radius:14px;padding:0 0 10px;margin:10px 0;overflow:hidden}
+#v details.sub>summary{list-style-position:inside!important;background:#1e2238;color:var(--m);border-radius:12px;padding:14px 12px!important}
+#v details.sub[open]>summary{margin-bottom:8px}
+#v details.sub>summary .inv-summary-values{display:inline-flex;vertical-align:middle;max-width:calc(100% - 28px)}
+#v details.cart>summary{list-style-position:inside!important}
+#v details.rc>summary{list-style-position:inside!important}
+#v details details>summary{list-style-position:inside!important}
