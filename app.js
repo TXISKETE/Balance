@@ -40,7 +40,7 @@ function resumen(){
   <div class="gr in"><span><b>Renta fija</b></span><span>${eur(rfC.n)}</span><span>${eur(rfC.v)}</span>${bs(rfC.n,rfC.v)}</div></details>`}).join('')}
  <div class="gr tot"><span>Total activos</span><span>${eur(rv.n+rf.n)}</span><span>${eur(fv)}</span>${bs(rv.n+rf.n,fv)}</div>
  <div class="gr"><span>Comisiones pagadas</span><span></span><span></span><span class="ko">${eur(com)}</span><span></span></div></div></section></div>
- <section><div class="f"><button data-a="exp">Exportar copia</button><button data-a="imp">Importar copia</button></div></section>`}
+ <section class="summary-refresh"><button class="p" data-a="upd">↻ Actualizar precios</button></section>`}
 const nt=t=>`<td style="text-align:left;color:var(--m);white-space:normal">${t||''}</td>`;
 function formReg(k,l){return`<section class="add-panel"><h2>${k==='saldos'?'Cuentas':k==='deudas'?'Deudas':'Intereses'}</h2><p class="muted">Registra un nuevo movimiento.</p><button class="p" data-a="openreg" data-k="${k}" data-l="${l}">＋ Añadir aportación</button></section>`}
 function listaReg(k){const r=S[k].map((x,i)=>({...x,i})).sort((p,q)=>p.fecha<q.fecha?1:-1);return`<section><h2>Histórico de registros</h2><div style="max-height:400px;overflow:auto"><table>${r.map(x=>`<tr><td>${fes(x.fecha)}</td><td>${x.banco}</td><td>${eur(x.importe)}</td>${nt(x.nota)}<td><button data-a="del" data-k="${k}" data-i="${x.i}">✕</button></td></tr>`).join('')}</table></div></section>`}
@@ -82,14 +82,14 @@ function intereses(){
  stats=b=>months.map(m=>monthStats(b,m)),
  interestFor=b=>rec.filter(r=>r.banco===b).reduce((a,x)=>a+x.importe,0),
  compound=z=>{const valid=z.filter(x=>x!==null&&Number.isFinite(x));return valid.length?(valid.reduce((f,x)=>f*(1+x/100),1)-1)*100:null},
- rateFor=b=>compound(stats(b).map(x=>x.rate)),
+ rateFor=b=>compound(stats(b).filter(x=>x.amount>0).map(x=>x.rate)),
  total=rec.reduce((a,x)=>a+x.importe,0),
- totalRate=compound(months.map(m=>{const rows=banks.map(b=>monthStats(b,m)).filter(x=>x.base!==null&&x.base!==0),base=rows.reduce((a,x)=>a+x.base,0),amount=rows.reduce((a,x)=>a+x.amount,0);return base?amount/base*100:null})),
+ totalRate=compound(months.map(m=>{const rows=banks.map(b=>monthStats(b,m)).filter(x=>x.amount>0&&x.base!==null&&x.base!==0),base=rows.reduce((a,x)=>a+x.base,0),amount=rows.reduce((a,x)=>a+x.amount,0);return base?amount/base*100:null})),
  card=(name,v,p,detail)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(p===null?'Sin balance mensual disponible': 'Rentabilidad acumulada del periodo: '+p.toFixed(2)+'%'+(detail?' · '+detail:''))+'</small></div>',
  cards='<div class="stat-grid">'+card('Intereses totales',total,totalRate,'suma de rentabilidades mensuales')+banks.map(b=>card(b,interestFor(b),rateFor(b),'capitalización compuesta mes a mes')).join('')+'</div>',
  opts=[['ytd','Este año'],['1','Último mes'],['3','Últimos 3 meses'],['6','Últimos 6 meses'],['12','Últimos 12 meses'],['all','Todo el histórico']],
  R=months.map(m=>{const v=banks.map(b=>monthStats(b,m).amount);return{l:fm(m),v,t:v.reduce((a,b)=>a+b,0)}}),
- rateRows=months.map(m=>{const z=banks.map(b=>monthStats(b,m)).filter(x=>x.base!==null&&x.base!==0),base=z.reduce((a,x)=>a+x.base,0),amount=z.reduce((a,x)=>a+x.amount,0);return{m,rate:base?amount/base*100:null}});
+ rateRows=months.map(m=>{const z=banks.map(b=>monthStats(b,m)).filter(x=>x.amount>0&&x.base!==null&&x.base!==0),base=z.reduce((a,x)=>a+x.base,0),amount=z.reduce((a,x)=>a+x.amount,0);return{m,rate:base?amount/base*100:null}});
  $('#v').innerHTML=formReg('intereses','Interés')+cards+`<div class="f period-filters"><label>Periodo de cálculo ${selH('fi','periodo',opts,period)}</label><label>Banco ${selH('fi','banco',[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FI.banco)}</label></div><details class="fold"><summary>Ver desglose de intereses</summary><section><h2>Intereses recibidos por mes</h2><div style="max-height:320px;overflow:auto"><table><tr><td><b>Mes</b></td>${banks.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td><td><b>Rentabilidad mensual</b></td></tr>${R.map((x,i)=>`<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td><td>${rateRows[i].rate===null?'—':rateRows[i].rate.toFixed(2)+'%'}</td></tr>`).join('')}</table></div>${barras(R,banks)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés');
 }
 
@@ -152,10 +152,10 @@ function historico(){
  en=(a,k)=>S.bancos.reduce((t,b)=>{const x=a.filter(r=>r.banco===b&&r.fecha<=k+'-31').sort((p,q)=>p.fecha<q.fecha?-1:1);return t+(x.length?x[x.length-1].importe:0)},0),
  SR=S.fondos.map(f=>serie(f,M)),
  R=M.map((k,i)=>{const liq=en(S.saldos,k),deu=en(S.deudas,k),val=SR.reduce((t,r)=>t+r[i].val,0);return{k,liq,deu,val,pat:liq+val-deu}});
- R.forEach((r,i)=>{const p=R[i-1];r.vr=p?r.liq-p.liq:0;r.pv=p&&p.liq?r.vr/p.liq*100:0;r.gan=p?r.pat-p.pat:0;r.rat=r.liq+r.val?r.deu/(r.liq+r.val):0});
+ R.forEach((r,i)=>{const p=R[i-1];r.vr=p?r.liq-p.liq:0;r.pv=p&&p.liq?r.vr/p.liq*100:0;r.gan=p?r.pat-p.pat:0;r.rat=r.liq+r.val?r.deu/(r.liq+r.val):0;r.total=r.liq+r.val;r.vt=p?r.total-p.total:0;r.pt=p&&p.total?r.vt/p.total*100:0});
  const V=cut(R),c=v=>v>=0?'ok':'ko',h=t=>`<td><b>${t}</b></td>`;
- $('#v').innerHTML=R.length?`<section><h2>Histórico</h2><div class="f">${rgSel()}</div><div style="max-height:480px;overflow:auto"><table><tr>${h('Mes')}${h('Liquidez')}${h('Variación')}${h('%')}${h('Deuda total')}${h('Inversión')}${h('Patrimonio neto')}${h('Ganancia patrimonio')}${h('Ratio deuda/activos')}</tr>
- ${V.slice().reverse().map(r=>`<tr><td>${fm(r.k)}</td><td>${eur(r.liq)}</td><td class="${c(r.vr)}">${eur(r.vr)}</td><td class="${c(r.pv)}">${r.pv.toFixed(2)} %</td><td>${eur(r.deu)}</td><td>${eur(r.val)}</td><td class="${c(r.pat)}">${eur(r.pat)}</td><td class="${c(r.gan)}">${eur(r.gan)}</td><td>${r.rat.toFixed(2)}</td></tr>`).join('')}</table></div></section>
+ $('#v').innerHTML=R.length?`<section><h2>Histórico</h2><div class="f">${rgSel()}</div><div style="max-height:480px;overflow:auto"><table><tr>${h('Mes')}${h('Liquidez')}${h('Variación')}${h('%')}${h('Inversión')}${h('Efectivo + inversiones')}${h('Variación')}${h('%')}${h('Deuda total')}${h('Patrimonio neto')}${h('Ganancia patrimonio')}${h('Ratio deuda/activos')}</tr>
+ ${V.slice().reverse().map(r=>`<tr><td>${fm(r.k)}</td><td>${eur(r.liq)}</td><td class="${c(r.vr)}">${eur(r.vr)}</td><td class="${c(r.pv)}">${r.pv.toFixed(2)} %</td><td>${eur(r.val)}</td><td>${eur(r.total)}</td><td class="${c(r.vt)}">${eur(r.vt)}</td><td class="${c(r.pt)}">${r.pt.toFixed(2)} %</td><td>${eur(r.deu)}</td><td class="${c(r.pat)}">${eur(r.pat)}</td><td class="${c(r.gan)}">${eur(r.gan)}</td><td>${r.rat.toFixed(2)}</td></tr>`).join('')}</table></div></section>
  <section><h2>Evolución mensual</h2>${lineas(V,[['liq','#6366f1','Liquidez'],['deu','#ef4444','Deuda'],['pat','#10b981','Patrimonio neto']])}
  </section>`:'<section>Aún no hay datos. Añade saldos, deudas o aportaciones.</section>'}
 function ordenar(){const o=(a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0;['saldos','deudas','intereses'].forEach(k=>S[k].sort(o));S.fondos.forEach(f=>{f.ap.sort(o);f.hist.sort(o)});S.carteras.forEach(c=>c.com.sort(o))}
@@ -169,7 +169,7 @@ const msg=t=>{const m=$('#msg');if(m)m.textContent=t};
 async function buscarAct(){const q=$('#q').value.trim();if(!q)return;msg('Buscando…');try{const d=await api('/api/buscar?q='+encodeURIComponent(q));RES=d.r;$('#res').innerHTML=resHTML();msg((RES.length?'':'Sin resultados. ')+(d.avisos.length?'Avisos: '+d.avisos.join(' · '):''))}catch(e){msg('No se pudo: '+e.message)}}
 async function anadir(j){const r=RES[j],c=$('#cart').value;if(S.fondos.some(f=>f.fuente===r.fuente&&f.ext===r.id&&f.cartera===c))return msg('Ya está en esa cartera');msg('Añadiendo…');
  try{const d=await api('/api/precio?fuente='+r.fuente+'&id='+encodeURIComponent(r.id)),f={n:r.nombre,clase:r.clase,fuente:r.fuente,ext:r.id,cartera:c,moneda:d.moneda,tipo:/bond|treasury|government|fixed income|corporate|aggregate/i.test(r.nombre)?'F':'V',vl:0,ap:[],hist:[]};setVl(f,d.precio,d.fecha,d.orig,d.tc);S.fondos.push(f);RES=[];save();go('Inversiones');msg('Añadido: '+r.nombre)}catch(e){msg('No se pudo: '+e.message)}}
-async function actualizar(){msg('Actualizando precios…');let ok=0,errores=[];for(const f of S.fondos.filter(f=>f.fuente)){try{const d=await api('/api/precio?fuente='+f.fuente+'&id='+encodeURIComponent(f.ext));setVl(f,d.precio,d.fecha,d.orig,d.tc);f.moneda=d.moneda;ok++}catch(e){errores.push({nombre:f.n,fuente:f.fuente,id:f.ext,error:e.message||String(e)})}}save();go('Inversiones');const resumen=errores.length?ok+' actualizados; '+errores.length+' con error:\n'+errores.map(x=>'• '+x.nombre+' ('+x.fuente+': '+x.id+'): '+x.error).join('\n'):'Todos los precios actualizados correctamente ('+ok+').';msg(resumen)}
+async function actualizar(vista=tab){const activos=S.fondos.filter(f=>f.fuente);let ok=0,errores=[];for(let i=0;i<activos.length;i++){const f=activos[i];try{const d=await api('/api/precio?fuente='+f.fuente+'&id='+encodeURIComponent(f.ext));setVl(f,d.precio,d.fecha,d.orig,d.tc);f.moneda=d.moneda;ok++}catch(e){errores.push({nombre:f.n,fuente:f.fuente,id:f.ext,error:e.message||String(e)})}if(f.fuente==='coingecko'&&i<activos.length-1)await new Promise(r=>setTimeout(r,1300))}save();go(vista);const resumen=errores.length?ok+' actualizados; '+errores.length+' con error:\\n'+errores.map(x=>'• '+x.nombre+' ('+x.fuente+': '+x.id+'): '+x.error).join('\\n'):'Todos los precios actualizados correctamente ('+ok+').';alert(resumen)}
 document.addEventListener('click',e=>{const t=e.target,a=t.dataset.a,i=+t.dataset.i;
  if(t.dataset.tab)return go(t.dataset.tab);if(!a)return;
  if(a==='banco'){const n=(prompt('Nombre del banco')||'').trim();if(n&&!S.bancos.includes(n))S.bancos.push(n)}
@@ -189,7 +189,7 @@ document.addEventListener('click',e=>{const t=e.target,a=t.dataset.a,i=+t.datase
  else if(a==='imp'){$('#imp').click();return}
  else if(a==='buscar'){buscarAct();return}
  else if(a==='addres'){anadir(+t.dataset.r);return}
- else if(a==='upd'){actualizar();return}
+ else if(a==='upd'){actualizar(tab);return}
  else if(a==='unlock'){desbloquear($('#pwl').value);return}
  else if(a==='sync'){activar();return}
  else if(a==='subir'){sube();return}
@@ -231,8 +231,8 @@ async function activar(){const m=t=>{const e=$('#msgA');if(e)e.textContent=t},a=
  try{const txt=await remoto();if(txt){if(!confirm('Ya hay datos guardados en la nube. ¿Cargarlos aquí? Se sustituirán los datos de este dispositivo.')){CFG={};return m('')}S=await abrir(txt,a)}else await nuevaClave(a);
   localStorage.setItem('fin_cfg',JSON.stringify(CFG));await guardarClave();migrar();await sube();if(VAULT.t)localStorage.removeItem(K);go('Ajustes')}
  catch(e){CFG={};VAULT.key=null;m(e.name==='OperationError'?'Esa contraseña no corresponde a los datos que hay en la nube':'No se pudo: '+e.message)}}
-function ajustes(){const ok=VAULT.key;$('#v').innerHTML=ok?`<section><h2>Sincronización</h2><p>Los datos se cifran en este dispositivo y en la nube solo hay un bloque ilegible. Estado: <b>${($('#est')||{}).textContent||''}</b></p><div class="f"><button data-a="subir">Sincronizar ahora</button><button data-a="bloq">Bloquear</button></div><p style="color:var(--m)">Si pierdes la contraseña, los datos no se pueden recuperar. «Exportar copia» (en Resumen) genera un archivo sin cifrar.</p></section>`
- :`<section><h2>Sincronización y cifrado</h2><p style="color:var(--m)">Introduce una contraseña de cifrado (mínimo 8 caracteres). Será la misma en todos tus dispositivos. Los datos se cifran antes de enviarse a la nube.</p><div class="f"><input type="password" id="pw1" placeholder="Contraseña de cifrado (mín. 8)"><input type="password" id="pw2" placeholder="Repite la contraseña"></div><div class="f"><button class="p" data-a="sync">Activar</button></div><p id="msgA"></p></section>`}
+function ajustes(){const ok=VAULT.key;$('#v').innerHTML='<section><h2>Copias de seguridad</h2><p style="color:var(--m)">Exporta una copia sin cifrar o importa un archivo JSON anterior.</p><div class="f"><button data-a="exp">Exportar copia</button><button data-a="imp">Importar copia</button></div></section>'+ (ok?`<section><h2>Sincronización</h2><p>Los datos se cifran en este dispositivo y en la nube solo hay un bloque ilegible. Estado: <b>${($('#est')||{}).textContent||''}</b></p><div class="f"><button data-a="subir">Sincronizar ahora</button><button data-a="bloq">Bloquear</button></div><p style="color:var(--m)">Si pierdes la contraseña, los datos no se pueden recuperar. «Exportar copia» genera un archivo sin cifrar.</p></section>`
+ :`<section><h2>Sincronización y cifrado</h2><p style="color:var(--m)">Introduce una contraseña de cifrado (mínimo 8 caracteres). Será la misma en todos tus dispositivos. Los datos se cifran antes de enviarse a la nube.</p><div class="f"><input type="password" id="pw1" placeholder="Contraseña de cifrado (mín. 8)"><input type="password" id="pw2" placeholder="Repite la contraseña"></div><div class="f"><button class="p" data-a="sync">Activar</button></div><p id="msgA"></p></section>`)}
 document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(e.target.id==='q'){e.preventDefault();buscarAct()}else if(e.target.id==='pwl'){e.preventDefault();desbloquear(e.target.value)}});
 function pantallaBloqueo(){ $('#nav').innerHTML='';$('#v').innerHTML='<section><h2>🔒 Datos cifrados</h2><div class="f"><input type="password" id="pwl" placeholder="Contraseña"><button class="p" data-a="unlock">Entrar</button></div><p id="msg2"></p></section>';const e=$('#pwl');if(e)e.focus()}
 async function arranque(){try{CFG=JSON.parse(localStorage.getItem('fin_cfg')||'{}')}catch(e){CFG={}}
