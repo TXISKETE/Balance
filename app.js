@@ -57,16 +57,15 @@ function evol(k,vl){
  return`<section><h2>Evolución</h2><div class="f">${selH('fe',k,[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FE[k])}${selH('fm',k,[['r','Cada registro'],['m','Último registro de cada mes']],FM[k])}${rgSel()}</div>${V.length?`<div style="max-height:360px;overflow:auto"><table><tr>${h('Fecha')}${bs.map(b=>h(b)).join('')}${bs.length>1?h('Total'):''}${h(vl)}</tr>${V.slice().reverse().map(r=>`<tr><td>${fes(r.k)}</td>${bs.map((b,j)=>`<td>${eur(r['b'+j])}</td>`).join('')}${bs.length>1?`<td>${eur(r.t)}</td>`:''}<td class="${c(r.d)}">${r.d==null?'':eur(r.d)}</td></tr>`).join('')}</table></div>`+lineas(V,sr):'<p>Aún no hay datos.</p>'}</section>`}
 function registroDialog(k,l){const q=S.bancos.includes(SEL.b)?SEL.b:S.bancos[0];return`<dialog class="modal" id="regdlg"><form method="dialog" class="modal-card"><button class="modal-x" type="submit" formnovalidate value="cancel" aria-label="Cerrar">×</button><h2>Nueva aportación</h2><label>Cuenta / banco<select id="b" data-a="selb">${(S.bancos.length?'':'<option value="">Selecciona banco…</option>')+S.bancos.map(b=>`<option${b===q?' selected':''}>${b}</option>`).join('')}<option value="__n">＋ Nuevo banco…</option></select></label><label>Fecha<input type="date" id="d" value="${hoy()}" required></label><label>Importe (€)<input type="number" step="0.01" id="m" placeholder="${l}" required></label><label>Comentario<input id="n" placeholder="Opcional"></label><div class="modal-actions"><button type="submit" formnovalidate value="cancel">Cancelar</button><button class="p" type="button" data-a="add" data-k="${k}">Guardar aportación</button></div></form></dialog>`}
 function balanceStats(k){
- const rs=S[k],banks=S.bancos.filter(b=>rs.some(r=>r.banco===b));
- const rows=banks.map(b=>{
-  const own=rs.filter(r=>r.banco===b).sort((a,z)=>a.fecha<z.fecha?-1:1),last=own[own.length-1];
-  const month=last.fecha.slice(0,7),[y,m]=month.split('-').map(Number),prevMonth=new Date(y,m-2,1),cut=prevMonth.getFullYear()+'-'+String(prevMonth.getMonth()+1).padStart(2,'0');
-  const prev=own.filter(r=>r.fecha.slice(0,7)===cut).slice(-1)[0]||own.filter(r=>r.fecha<month+'-01').slice(-1)[0];
-  return{b,value:last.importe,delta:prev?last.importe-prev.importe:null,prev:prev?prev.importe:null};
- });
- const value=rows.reduce((a,x)=>a+x.value,0),hasPrev=rows.length>0&&rows.every(x=>x.prev!==null),prev=hasPrev?rows.reduce((a,x)=>a+x.prev,0):null,delta=hasPrev?value-prev:null;
- const card=(name,v,d,p)=>'<div class="stat-card"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':(k==='deudas'?(d<=0?'ok':'ko'):(d>=0?'ok':'ko')))+'">'+(d===null?'Sin dato del mes anterior':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
- return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,delta,prev?delta/prev*100:null)+rows.map(x=>card(x.b,x.value,x.delta,x.prev?x.delta/x.prev*100:null)).join('')+'</div>';
+ const rs=S[k],banks=S.bancos.filter(b=>rs.some(r=>r.banco===b)),
+ today=hoy(),monthStart=today.slice(0,7)+'-01',
+ prevEnd=new Date(today.slice(0,4),Number(today.slice(5,7))-1,0),prevEndKey=prevEnd.getFullYear()+'-'+String(prevEnd.getMonth()+1).padStart(2,'0')+'-'+String(prevEnd.getDate()).padStart(2,'0'),
+ beforeEnd=new Date(prevEnd.getFullYear(),prevEnd.getMonth(),0),beforeEndKey=beforeEnd.getFullYear()+'-'+String(beforeEnd.getMonth()+1).padStart(2,'0')+'-'+String(beforeEnd.getDate()).padStart(2,'0'),
+ at=(rows,date)=>{const x=rows.filter(r=>r.fecha<=date).sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0);return x.length?x[x.length-1].importe:null},
+ rows=banks.map(b=>{const own=rs.filter(r=>r.banco===b),value=at(own,today),prev=at(own,prevEndKey),before=at(own,beforeEndKey);return{b,value:value===null?0:value,delta:prev!==null&&before!==null?prev-before:null,prev:before}});
+ const value=rows.reduce((a,x)=>a+x.value,0),hasPrev=rows.length>0&&rows.every(x=>x.delta!==null),prev=hasPrev?rows.reduce((a,x)=>a+x.prev,0):null,delta=hasPrev?rows.reduce((a,x)=>a+x.delta,0):null;
+ const card=(name,v,d,p,hero=false)=>'<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':(k==='deudas'?(d<=0?'ok':'ko'):(d>=0?'ok':'ko')))+'">'+(d===null?'Sin datos suficientes para comparar':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
+ return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,delta,prev!==null&&prev!==0?delta/prev*100:null,true)+rows.map(x=>card(x.b,x.value,x.delta,x.prev!==null&&x.prev!==0?x.delta/x.prev*100:null)).join('')+'</div>';
 }
 function registro(k,l){$('#v').innerHTML=formReg(k,l)+balanceStats(k)+`<details class="fold"><summary>Ver evolución</summary>${evol(k,k==='deudas'?'Variación (cuota)':'Variación')}</details><details class="fold"><summary>Ver registros anteriores (${S[k].length})</summary>${listaReg(k)}</details>`+registroDialog(k,l)}
 
