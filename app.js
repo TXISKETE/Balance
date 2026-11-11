@@ -65,7 +65,7 @@ function balanceStats(k){
   return{b,value:value===null?0:value,delta,prev}});
  const value=rows.reduce((a,x)=>a+x.value,0),comparable=rows.filter(x=>x.delta!==null),delta=comparable.reduce((a,x)=>a+x.delta,0),prev=value-delta;
  const card=(name,v,d,p,hero=false)=>'<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':(k==='deudas'?(d<=0?'ok':'ko'):(d>=0?'ok':'ko')))+'">'+(d===null?'Sin datos del mes anterior':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
- return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,comparable.length?delta:null,prev!==0?delta/prev*100:null,true)+rows.map(x=>card(x.b,x.value,x.delta,x.prev!==null&&x.prev!==0?x.delta/x.prev*100:null)).join('')+'</div>';
+ return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,comparable.length===rows.length?delta:null,comparable.length===rows.length&&prev!==0?delta/prev*100:null,true)+rows.map(x=>card(x.b,x.value,x.delta,x.prev!==null&&x.prev!==0?x.delta/x.prev*100:null)).join('')+'</div>';
 }
 function registro(k,l){$('#v').innerHTML=formReg(k,l)+balanceStats(k)+`<details class="fold"><summary>Ver evolución</summary>${evol(k,k==='deudas'?'Variación (cuota)':'Variación')}</details><details class="fold"><summary>Ver registros anteriores (${S[k].length})</summary>${listaReg(k)}</details>`+registroDialog(k,l)}
 
