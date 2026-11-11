@@ -35,8 +35,9 @@ function resumen(){
  <div class="gr h"><span></span><span>Invertido</span><span>Valor actual</span><span>Beneficio</span><span>% beneficio</span></div>
  ${S.carteras.map(c=>{const as=F.filter(x=>x.f.cartera===c.n),n=as.reduce((t,x)=>t+x.n,0),v=as.reduce((t,x)=>t+x.v,0);
   const gv=t=>{const z=as.filter(x=>(x.f.tipo||'V')===t);return{n:z.reduce((q,x)=>q+x.n,0),v:z.reduce((q,x)=>q+x.v,0)}},rvC=gv('V'),rfC=gv('F'),mixta=rvC.v>0&&rfC.v>0;
-  const filas=mixta?`<div class="gr in"><span><b>Renta variable</b> <small style="color:var(--m)">(${P(rvC.v,v)})</small></span><span>${eur(rvC.n)}</span><span>${eur(rvC.v)}</span>${bs(rvC.n,rvC.v)}</div><div class="gr in"><span><b>Renta fija</b> <small style="color:var(--m)">(${P(rfC.v,v)})</small></span><span>${eur(rfC.n)}</span><span>${eur(rfC.v)}</span>${bs(rfC.n,rfC.v)}</div>`:as.map(x=>`<div class="gr in"><span>${x.f.n} <small style="color:var(--m)">(${P(x.v,fv)})</small></span><span>${eur(x.n)}</span><span>${eur(x.v)}</span>${bs(x.n,x.v)}</div>`).join('')||'<div class="gr in"><span>Sin activos</span></div>';
-  return`<details class="rc" ${dop('r:'+c.n)}><summary class="gr"><span><b>${c.n}</b> <small style="color:var(--m)">(${P(v,fv)})</small></span><span>${eur(n)}</span><span>${eur(v)}</span>${bs(n,v)}</summary>${filas}</details>`}).join('')}
+  const categorias=mixta?`<div class="gr in category-row"><span><b>Renta variable</b> <small style="color:var(--m)">(${P(rvC.v,v)})</small></span><span>${eur(rvC.n)}</span><span>${eur(rvC.v)}</span>${bs(rvC.n,rvC.v)}</div><div class="gr in category-row"><span><b>Renta fija</b> <small style="color:var(--m)">(${P(rfC.v,v)})</small></span><span>${eur(rfC.n)}</span><span>${eur(rfC.v)}</span>${bs(rfC.n,rfC.v)}</div>`:'';
+  const activos=as.map(x=>`<div class="gr in asset-row"><span>${x.f.n} <small style="color:var(--m)">(${P(x.v,v)})</small></span><span>${eur(x.n)}</span><span>${eur(x.v)}</span>${bs(x.n,x.v)}</div>`).join('')||'<div class="gr in"><span>Sin activos</span></div>';
+  return`<details class="rc" ${dop('r:'+c.n)}><summary class="gr"><span><b>${c.n}</b> <small style="color:var(--m)">(${P(v,fv)})</small></span><span>${eur(n)}</span><span>${eur(v)}</span>${bs(n,v)}</summary>${categorias}${activos}</details>`}).join('')}
  <div class="gr tot"><span>Total activos</span><span>${eur(rv.n+rf.n)}</span><span>${eur(fv)}</span>${bs(rv.n+rf.n,fv)}</div>
  <div class="gr"><span>Comisiones pagadas</span><span></span><span></span><span class="ko">${eur(com)}</span><span></span></div></div></section></div>
 `}
@@ -58,12 +59,13 @@ function registroDialog(k,l){const q=S.bancos.includes(SEL.b)?SEL.b:S.bancos[0];
 function balanceStats(k){
  const rs=S[k],banks=S.bancos.filter(b=>rs.some(r=>r.banco===b)),
  today=hoy(),monthStart=today.slice(0,7)+'-01',
- prevEnd=new Date(today.slice(0,4),Number(today.slice(5,7))-1,0),prevEndKey=prevEnd.getFullYear()+'-'+String(prevEnd.getMonth()+1).padStart(2,'0')+'-'+String(prevEnd.getDate()).padStart(2,'0'),
  at=(rows,date)=>{const x=rows.filter(r=>r.fecha<=date).sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0);return x.length?x[x.length-1].importe:null},
- rows=banks.map(b=>{const own=rs.filter(r=>r.banco===b),value=at(own,today),prev=at(own,prevEndKey);return{b,value:value===null?0:value,delta:value!==null&&prev!==null?value-prev:null,prev}});
- const value=rows.reduce((a,x)=>a+x.value,0),hasPrev=rows.length>0&&rows.every(x=>x.delta!==null),prev=hasPrev?rows.reduce((a,x)=>a+x.prev,0):null,delta=hasPrev?rows.reduce((a,x)=>a+x.delta,0):null;
- const card=(name,v,d,p,hero=false)=>'<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':(k==='deudas'?(d<=0?'ok':'ko'):(d>=0?'ok':'ko')))+'">'+(d===null?'Sin datos suficientes para comparar':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
- return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,delta,prev!==null&&prev!==0?delta/prev*100:null,true)+rows.map(x=>card(x.b,x.value,x.delta,x.prev!==null&&x.prev!==0?x.delta/x.prev*100:null)).join('')+'</div>';
+ rows=banks.map(b=>{const own=rs.filter(r=>r.banco===b),value=at(own,today),currentMonth=own.filter(r=>r.fecha>=monthStart&&r.fecha<=today),previous=at(own,monthStart.slice(0,8)+'00');
+  const prev=currentMonth.length?previous:(value===null?null:value),delta=currentMonth.length&&previous!==null?value-previous:currentMonth.length&&previous===null?null:0;
+  return{b,value:value===null?0:value,delta,prev}});
+ const value=rows.reduce((a,x)=>a+x.value,0),comparable=rows.filter(x=>x.delta!==null),delta=comparable.reduce((a,x)=>a+x.delta,0),prev=value-delta;
+ const card=(name,v,d,p,hero=false)=>'<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+(d===null?'':(k==='deudas'?(d<=0?'ok':'ko'):(d>=0?'ok':'ko')))+'">'+(d===null?'Sin datos del mes anterior':(d>=0?'+':'')+eur(d)+' · '+(p===null?'—':(p>=0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior')+'</small></div>';
+ return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,comparable.length?delta:null,prev!==0?delta/prev*100:null,true)+rows.map(x=>card(x.b,x.value,x.delta,x.prev!==null&&x.prev!==0?x.delta/x.prev*100:null)).join('')+'</div>';
 }
 function registro(k,l){$('#v').innerHTML=formReg(k,l)+balanceStats(k)+`<details class="fold"><summary>Ver evolución</summary>${evol(k,k==='deudas'?'Variación (cuota)':'Variación')}</details><details class="fold"><summary>Ver registros anteriores (${S[k].length})</summary>${listaReg(k)}</details>`+registroDialog(k,l)}
 
