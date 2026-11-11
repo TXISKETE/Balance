@@ -9,7 +9,7 @@ const ultimo=(a,b)=>{const x=a.filter(r=>r.banco===b).sort((p,q)=>p.fecha<q.fech
 const suma=a=>a.reduce((s,r)=>s+r.importe,0);
 const parts=f=>f.ap.reduce((s,a)=>s+a.part,0);
 const inv=f=>f.ap.reduce((s,a)=>s+a.part*a.vl,0);
-function go(t){const mismo=t===tab,y=window.scrollY;if(!mismo){OPEN.clear();SEEN.clear()}tab=t;const rb=$('#refreshSummary');if(rb)rb.style.display=t==='Resumen'?'inline-block':'none';$('#nav').innerHTML=TABS.map(x=>`<button class="${x===t?'on':''}" data-tab="${x}">${x}</button>`).join('');
+function go(t){const mismo=t===tab,y=window.scrollY;if(!mismo){OPEN.clear();SEEN.clear()}tab=t;const rb=$('#refreshSummary');if(rb)rb.style.display='inline-block';$('#nav').innerHTML=TABS.map(x=>`<button class="${x===t?'on':''}" data-tab="${x}">${x}</button>`).join('');
  ({Resumen:resumen,Cuentas:()=>registro('saldos','Saldo'),Deudas:()=>registro('deudas','Deuda'),Inversiones:inversiones,Intereses:intereses,Histórico:historico,Ajustes:ajustes})[t]();if(mismo)window.scrollTo(0,y)}
 function resumen(){
  const liq=S.bancos.reduce((s,b)=>s+ultimo(S.saldos,b),0),F=S.fondos.map(f=>({f,n:inv(f),v:parts(f)*f.vl})),
@@ -143,7 +143,7 @@ function inversiones(){
  <div class="f"><button data-a="delcart" data-c="${ci}">Eliminar cartera</button></div>
  <details ${dop('m:'+c.n)}><summary>Comisiones de la cartera (${c.com.length}) · ${eur(cm)}</summary><div class="f"><input type="date" id="cd${ci}" value="${hoy()}"><input type="number" step="0.01" id="cm${ci}" placeholder="Importe €"><input id="cn${ci}" placeholder="Comentario (ej. comisión anual)"><button class="p" data-a="com" data-c="${ci}">Añadir comisión</button></div><table>${ord(c.com).map(x=>`<tr><td>${fes(x.fecha)}</td><td>${eur(x.importe)}</td>${nt(x.nota)}<td><button data-a="delcom" data-c="${ci}" data-j="${x.j}">✕</button></td></tr>`).join('')}</table></details>
  ${as.map(act).join('')||'<p>Sin activos todavía.</p>'}</details></section>`};
- $('#v').innerHTML=inversionDialog()+`<section><h2>Añadir a una cartera</h2><div class="f"><select id="cart" data-a="selc">${S.carteras.map(c=>`<option${c.n===(S.carteras.some(x=>x.n===SEL.cart)?SEL.cart:S.carteras[0].n)?' selected':''}>${c.n}</option>`).join('')}<option value="__n">➕ Nueva cartera…</option></select><input id="q" placeholder="Buscar: ISIN, acción, bitcoin…"><button class="p" data-a="buscar">Buscar</button><button data-a="upd">Actualizar precios</button></div>
+ $('#v').innerHTML=inversionDialog()+`<section><h2>Añadir a una cartera</h2><div class="f"><select id="cart" data-a="selc">${S.carteras.map(c=>`<option${c.n===(S.carteras.some(x=>x.n===SEL.cart)?SEL.cart:S.carteras[0].n)?' selected':''}>${c.n}</option>`).join('')}<option value="__n">➕ Nueva cartera…</option></select><input id="q" placeholder="Buscar: ISIN, acción, bitcoin…"><button class="p" data-a="buscar">Buscar</button><button data-a="upd" class="investment-update">Actualizar precios</button></div>
  <div class="f"><input id="nf" placeholder="O añadir un activo a mano (nombre)"><button data-a="fondo">+ activo</button></div><p id="msg"></p><div id="res">${resHTML()}</div></section>`
  +S.carteras.map(cart).join('')
  +(AC.length?`<details class="fold"><summary>Evolución general de las inversiones</summary><section><div class="f">${selH('flt','tipo',[['','Renta fija y variable'],['V','Solo renta variable'],['F','Solo renta fija']],FL.tipo)}${selH('flt','cart',[['','Todas las carteras'],...S.carteras.map(c=>[c.n,c.n])],FL.cart)}${selH('flt','fondo',[['','Todos los activos'],...ok.map(i=>[String(i),S.fondos[i].n])],FL.fondo)}${rgSel()}</div>${tablaM(AC,sel.length===1&&dec(S.fondos[sel[0]]))}${lineas(AC,[['t','#9ca3af','Total aportado'],['val','#f97316','Valor acumulado']])}</section></details>`:'')}
@@ -169,22 +169,33 @@ const msg=t=>{const m=$('#msg');if(m)m.textContent=t};
 async function buscarAct(){const q=$('#q').value.trim();if(!q)return;msg('Buscando…');try{const d=await api('/api/buscar?q='+encodeURIComponent(q));RES=d.r;$('#res').innerHTML=resHTML();msg((RES.length?'':'Sin resultados. ')+(d.avisos.length?'Avisos: '+d.avisos.join(' · '):''))}catch(e){msg('No se pudo: '+e.message)}}
 async function anadir(j){const r=RES[j],c=$('#cart').value;if(S.fondos.some(f=>f.fuente===r.fuente&&f.ext===r.id&&f.cartera===c))return msg('Ya está en esa cartera');msg('Añadiendo…');
  try{const d=await api('/api/precio?fuente='+r.fuente+'&id='+encodeURIComponent(r.id)),f={n:r.nombre,clase:r.clase,fuente:r.fuente,ext:r.id,cartera:c,moneda:d.moneda,tipo:/bond|treasury|government|fixed income|corporate|aggregate/i.test(r.nombre)?'F':'V',vl:0,ap:[],hist:[]};setVl(f,d.precio,d.fecha,d.orig,d.tc);S.fondos.push(f);RES=[];save();go('Inversiones');msg('Añadido: '+r.nombre)}catch(e){msg('No se pudo: '+e.message)}}
+let updateResults=[],updateStatus='idle';
+function mostrarResumenActualizacion(){
+ const dlg=document.createElement('dialog');dlg.className='modal update-dialog';
+ const rows=updateResults.map(x=>'<tr><td>'+x.nombre+'</td><td>'+(x.precio||'—')+'</td><td>'+(x.fecha||'—')+'</td><td class="'+(x.error?'ko':'ok')+'">'+(x.error?'Error: '+x.error:'Actualizado')+'</td></tr>').join('');
+ dlg.innerHTML='<div class="modal-card update-card"><button class="modal-x" type="button" aria-label="Cerrar">×</button><h2>Resumen de actualización</h2><p class="muted">'+updateResults.filter(x=>!x.error).length+' actualizados · '+updateResults.filter(x=>x.error).length+' errores</p><div class="update-table-wrap"><table><thead><tr><td><b>Activo</b></td><td><b>Precio</b></td><td><b>Fecha</b></td><td><b>Estado</b></td></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No se actualizó ningún activo.</td></tr>')+'</tbody></table></div><div class="modal-actions"><button type="button" class="update-close">Cerrar</button></div></div>';
+ dlg.querySelector('.modal-x').addEventListener('click',()=>dlg.close());dlg.querySelector('.update-close').addEventListener('click',()=>dlg.close());dlg.addEventListener('close',()=>dlg.remove());document.body.appendChild(dlg);dlg.showModal();
+}
+function pintarEstadoActualizacion(status){
+ updateStatus=status;const el=$('#updateStatus');if(!el)return;
+ el.className='update-status '+status;el.textContent=status==='busy'?'':status==='ok'?'✓':status==='warn'?'!':status==='error'?'×':'';
+ el.title=status==='busy'?'Actualizando precios':status==='ok'?'Actualización correcta':status==='warn'?'Actualización con errores':status==='error'?'No se actualizó ningún activo':'Ver resumen de actualización';
+ el.setAttribute('aria-label',el.title);el.style.display=status==='idle'?'none':'inline-flex';
+}
 async function actualizar(vista=tab){
- const activos=S.fondos.filter(f=>f.fuente),dlg=document.createElement('dialog');
- dlg.className='modal update-dialog';dlg.innerHTML='<div class="modal-card update-card"><h2>Actualizando precios</h2><p class="update-progress">Preparando consulta…</p><ul class="update-log"></ul><div class="modal-actions"><button type="button" class="update-close" disabled>Cerrar</button></div></div>';
- document.body.appendChild(dlg);const progress=dlg.querySelector('.update-progress'),log=dlg.querySelector('.update-log'),close=dlg.querySelector('.update-close');
- const add=t=>{const li=document.createElement('li');li.textContent=t;log.appendChild(li);log.scrollTop=log.scrollHeight};
- close.addEventListener('click',()=>dlg.close());dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
- let ok=0,errores=[];
- progress.textContent='0 de '+activos.length+' activos actualizados';
- if(!activos.length)add('No hay activos con actualización automática.');
- for(let i=0;i<activos.length;i++){const f=activos[i];progress.textContent='Consultando '+(i+1)+' de '+activos.length+': '+f.n;
-  try{const d=await api('/api/precio?fuente='+f.fuente+'&id='+encodeURIComponent(f.ext));setVl(f,d.precio,d.fecha,d.orig,d.tc);f.moneda=d.moneda;ok++;add('✓ '+f.n+': '+d.precio+' '+(d.moneda||'')+' · fecha: '+(d.fecha||'no indicada'))}
-  catch(e){const error=e.message||String(e);errores.push({nombre:f.n,error});add('✕ '+f.n+': '+error)}
-  progress.textContent=(i+1)+' de '+activos.length+' · '+ok+' correctos · '+errores.length+' errores';
+ const activos=S.fondos.filter(f=>f.fuente);updateResults=[];pintarEstadoActualizacion('busy');
+ const trigger=$('#refreshSummary');if(trigger)trigger.disabled=true;
+ const inButton=document.querySelector('[data-a="upd"].investment-update');if(inButton)inButton.disabled=true;
+ let ok=0,errores=0;
+ for(let i=0;i<activos.length;i++){const f=activos[i];
+  try{const d=await api('/api/precio?fuente='+f.fuente+'&id='+encodeURIComponent(f.ext));setVl(f,d.precio,d.fecha,d.orig,d.tc);f.moneda=d.moneda;ok++;updateResults.push({nombre:f.n,precio:pf(d.precio)+' '+(d.moneda||'EUR'),fecha:d.fecha?fes(d.fecha):'No indicada'})}
+  catch(e){errores++;updateResults.push({nombre:f.n,error:e.message||String(e)})}
   if(f.fuente==='coingecko'&&i<activos.length-1)await new Promise(r=>setTimeout(r,1800))
  }
- save();go(vista);dlg.querySelector('h2').textContent='Actualización terminada';progress.textContent=ok+' actualizados · '+errores.length+' errores';add(errores.length?'Errores:':'Todos los precios se han actualizado correctamente.');close.disabled=false;
+ if(ok)save();
+ go(vista);
+ pintarEstadoActualizacion(ok===0?'error':errores?'warn':'ok');
+ if(trigger)trigger.disabled=false;
 }
 document.addEventListener('click',e=>{const t=e.target,a=t.dataset.a,i=+t.dataset.i;
  if(t.dataset.tab)return go(t.dataset.tab);if(!a)return;
@@ -206,6 +217,7 @@ document.addEventListener('click',e=>{const t=e.target,a=t.dataset.a,i=+t.datase
  else if(a==='buscar'){buscarAct();return}
  else if(a==='addres'){anadir(+t.dataset.r);return}
  else if(a==='upd'){actualizar(tab);return}
+ else if(a==='updstats'){mostrarResumenActualizacion();return}
  else if(a==='unlock'){desbloquear($('#pwl').value);return}
  else if(a==='sync'){activar();return}
  else if(a==='subir'){sube();return}
