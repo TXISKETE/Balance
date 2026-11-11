@@ -14,7 +14,7 @@ function go(t){const mismo=t===tab,y=window.scrollY;if(!mismo){OPEN.clear();SEEN
 function resumen(){
  const liq=S.bancos.reduce((s,b)=>s+ultimo(S.saldos,b),0),F=S.fondos.map(f=>({f,n:inv(f),v:parts(f)*f.vl})),
  fv=F.reduce((s,x)=>s+x.v,0),deu=S.bancos.reduce((s,b)=>s+ultimo(S.deudas,b),0),tot=liq+fv,neto=tot-deu,
- P=(x,t)=>t?(x/t*100).toFixed(1)+'%':'0%',
+ P=(x,t)=>t?fp(x/t*100,1)+'\u00a0%':'0%',
  grp=t=>{const a=F.filter(x=>(x.f.tipo||'V')===t);return{n:a.reduce((s,x)=>s+x.n,0),v:a.reduce((s,x)=>s+x.v,0)}},rv=grp('V'),rf=grp('F'),
  bs=(n,v)=>`<span class="${v>=n?'ok':'ko'}">${eur(v-n)}</span><span class="${v>=n?'ok':'ko'}">${pct(v,n)}</span>`,
  ben=(n,v)=>`<td class="${v>=n?'ok':'ko'}">${eur(v-n)}</td><td class="${v>=n?'ok':'ko'}">${pct(v,n)}</td>`,
@@ -65,7 +65,7 @@ function balanceStats(k){
  monthValue=(own,key)=>{if(!key)return 0;const x=own.filter(r=>(r.fecha||'').slice(0,7)===key).sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0);return x.length?Number(x[x.length-1].importe)||0:0},
  rows=banks.map(b=>{const own=rs.filter(r=>r.banco===b),value=monthValue(own,currentKey),prev=monthValue(own,previousKey);return{b,value,delta:value-prev,prev}}),
  value=rows.reduce((a,x)=>a+x.value,0),delta=rows.reduce((a,x)=>a+x.delta,0),prev=rows.reduce((a,x)=>a+x.prev,0),
- card=(name,v,d,p,hero=false)=>{const color=d===0?'':(k==='deudas'?(d>0?'ko':'ok'):(d>0?'ok':'ko'));return '<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+color+'">'+(d>0?'+':'')+eur(d)+' · '+(p===null?'—':(p>0?'+':'')+p.toFixed(2)+'%')+' vs. mes anterior</small></div>'};
+ card=(name,v,d,p,hero=false)=>{const color=d===0?'':(k==='deudas'?(d>0?'ko':'ok'):(d>0?'ok':'ko'));return '<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small class="'+color+'">'+(d>0?'+':'')+eur(d)+' · '+(p===null?'—':(p>0?'+':'')+fp(p,2)+'\u00a0%')+' vs. mes anterior</small></div>'};
  return '<div class="stat-grid">'+card('Total '+(k==='saldos'?'en cuentas':'deuda'),value,delta,prev!==0?delta/prev*100:null,true)+rows.map(x=>card(x.b,x.value,x.delta,x.prev!==0?x.delta/x.prev*100:null)).join('')+'</div>';
 }
 function registro(k,l){$('#v').innerHTML=formReg(k,l)+balanceStats(k)+`<details class="fold"><summary>Ver evolución</summary>${evol(k,k==='deudas'?'Variación (cuota)':'Variación')}</details><details class="fold"><summary>Ver registros anteriores (${S[k].length})</summary>${listaReg(k)}</details>`+registroDialog(k,l)}
@@ -84,17 +84,18 @@ function intereses(){
  banks=active.map(x=>x.b),
  total=rec.reduce((n,x)=>n+x.importe,0),
  totalRate=compound(months.map(m=>{const rows=banks.map(b=>monthStats(b,m)).filter(x=>x.amount>0&&x.base!==null&&x.base>0),base=rows.reduce((n,x)=>n+x.base,0),amount=rows.reduce((n,x)=>n+x.amount,0);return base?amount/base*100:null})),
- card=(name,v,p,detail,hero=false)=>'<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(p===null?'Sin saldo anterior al abono': 'Rentabilidad compuesta del periodo: '+p.toFixed(2)+'%'+(detail?' · '+detail:''))+'</small></div>',
+ card=(name,v,p,detail,hero=false)=>'<div class="stat-card'+(hero?' hero':'')+'"><small>'+name+'</small><b>'+eur(v)+'</b><small>'+(p===null?'Sin saldo anterior al abono': 'Rentabilidad compuesta del periodo: '+fp(p,2)+'\u00a0%'+(detail?' · '+detail:''))+'</small></div>',
  opts=[['ytd','Este año'],['month','Este mes'],['3','Últimos 3 meses'],['6','Últimos 6 meses'],['12','Últimos 12 meses'],['all','Todo el histórico']],
  filters='<div class="f period-filters"><label>Periodo de cálculo '+selH('fi','periodo',opts,period)+'</label><label>Banco '+selH('fi','banco',[['','Todos los bancos'],...S.bancos.map(b=>[b,b])],FI.banco)+'</label></div>',
  cards='<div class="stat-grid">'+card('Intereses totales',total,totalRate,'suma de rentabilidades mensuales',true)+active.map(x=>card(x.b,x.amount,x.rate,'intereses cobrados')).join('')+'</div>',
  R=months.map(m=>{const v=banks.map(b=>monthStats(b,m).amount);return{l:fm(m),v,t:v.reduce((x,y)=>x+y,0)}}),
  rateRows=months.map(m=>{const z=banks.map(b=>monthStats(b,m)).filter(x=>x.amount>0&&x.base!==null&&x.base>0),base=z.reduce((n,x)=>n+x.base,0),amount=z.reduce((n,x)=>n+x.amount,0);return{m,rate:base?amount/base*100:null}});
- $('#v').innerHTML=formReg('intereses','Interés')+filters+cards+`<details class="fold"><summary>Ver desglose de intereses</summary><section><h2>Intereses recibidos por mes</h2><div style="max-height:320px;overflow:auto"><table><tr><td><b>Mes</b></td>${banks.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td><td><b>Rentabilidad mensual</b></td></tr>${R.slice().reverse().map(x=>{const i=months.findIndex(m=>fm(m)===x.l);return `<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td><td>${rateRows[i]?.rate==null?'—':rateRows[i].rate.toFixed(2)+'%'}</td></tr>`}).join('')}</table></div>${barras(R,banks)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés');
+ $('#v').innerHTML=formReg('intereses','Interés')+filters+cards+`<details class="fold"><summary>Ver desglose de intereses</summary><section><h2>Intereses recibidos por mes</h2><div style="max-height:320px;overflow:auto"><table><tr><td><b>Mes</b></td>${banks.map(b=>`<td><b>${b}</b></td>`).join('')}<td><b>Total</b></td><td><b>Rentabilidad mensual</b></td></tr>${R.slice().reverse().map(x=>{const i=months.findIndex(m=>fm(m)===x.l);return `<tr><td>${x.l}</td>${x.v.map(v=>`<td>${eur(v)}</td>`).join('')}<td>${eur(x.t)}</td><td>${rateRows[i]?.rate==null?'—':fp(rateRows[i].rate,2)+'\u00a0%'}</td></tr>`}).join('')}</table></div>${barras(R,banks)}</section></details><details class="fold"><summary>Ver registros anteriores (${S.intereses.length})</summary>${listaReg('intereses')}</details>`+registroDialog('intereses','Interés');
 }
 
 const fm=k=>{const[y,m]=k.split('-');return['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][m-1]+'-'+y.slice(2)};
-const pct=(v,n)=>n?((v/n-1)*100).toFixed(2)+' %':'–';
+const fp=(x,d=2)=>(+x||0).toLocaleString('es-ES',{minimumFractionDigits:d,maximumFractionDigits:d}),
+ pct=(v,n)=>n?fp((v/n-1)*100,2)+'\u00a0%':'–';
 let RES=[],SEL={b:'',cart:''},FE={saldos:'',deudas:''},FM={saldos:'r',deudas:'r'},FL={tipo:'',cart:'',fondo:''},RG='',FI={banco:'',esc:'m',periodo:'ytd'};
 const RGOPT=[['','Todo el histórico'],['3','Últimos 3 meses'],['6','Últimos 6 meses'],['12','Último año'],['24','Últimos 2 años']],
  COL=['#6366f1','#f59e0b','#10b981','#ef4444','#06b6d4','#a855f7','#84cc16','#f97316'],
@@ -120,8 +121,8 @@ const CLA={fondo:'Fondo',accion:'Acción',etf:'ETF',cripto:'Cripto'},dec=f=>f.cl
  kp=(t,v,c='',s='')=>`<div class="k"><small>${t}</small><b class="${c}">${v}</b>${s?`<small>${s}</small>`:''}</div>`,
  pf=v=>(+v||0).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:4}),SIM={USD:'$',GBP:'£',GBX:'p',JPY:'¥'},
  ext=f=>f.moneda&&f.moneda!=='EUR'&&f.vlo!=null,
- pSub=f=>{const d=f.fp||(f.hist.slice(-1)[0]||{}).fecha;return(d?(f.fpd?'precio del ':'actualizado el ')+fes(d):'sin fecha')+(ext(f)&&f.tc?` · 1 ${f.moneda} = ${(+f.tc).toFixed(4)} €`:'')},
- tablaM=(r,p)=>`<div style="max-height:320px;overflow:auto"><table><tr><td><b>Fecha</b></td><td><b>Aportación</b></td>${p?'<td><b>Particip.</b></td>':''}<td><b>Total aportado</b></td><td><b>Valor acum.</b></td></tr>${r.slice().reverse().map(x=>`<tr><td>${fm(x.k)}</td><td>${eur(x.ap)}</td>${p?`<td>${x.pa.toFixed(p)}</td>`:''}<td>${eur(x.t)}</td><td>${eur(x.val)}</td></tr>`).join('')}</table></div>`,
+ pSub=f=>{const d=f.fp||(f.hist.slice(-1)[0]||{}).fecha;return(d?(f.fpd?'precio del ':'actualizado el ')+fes(d):'sin fecha')+(ext(f)&&f.tc?` · 1 ${f.moneda} = ${fp(f.tc,4)} €`:'')},
+ tablaM=(r,p)=>`<div style="max-height:320px;overflow:auto"><table><tr><td><b>Fecha</b></td><td><b>Aportación</b></td>${p?'<td><b>Particip.</b></td>':''}<td><b>Total aportado</b></td><td><b>Valor acum.</b></td></tr>${r.slice().reverse().map(x=>`<tr><td>${fm(x.k)}</td><td>${eur(x.ap)}</td>${p?`<td>${fp(x.pa,p)}</td>`:''}<td>${eur(x.t)}</td><td>${eur(x.val)}</td></tr>`).join('')}</table></div>`,
  resHTML=()=>RES.map((r,j)=>`<div class="f" style="align-items:center"><span style="flex:1">${r.nombre}<br><small style="color:var(--m)">${r.detalle}</small></span><button class="p" data-a="addres" data-r="${j}">Añadir</button></div>`).join('');
 function inversionDialog(){return`<dialog class="modal" id="apdlg"><form method="dialog" class="modal-card"><button class="modal-x" type="submit" formnovalidate value="cancel" aria-label="Cerrar">×</button><h2>Nueva aportación</h2><label>Fecha<input type="date" id="apfecha" value="${hoy()}" required></label><label>Precio de compra (€)<input type="number" step="any" id="apprecio" placeholder="Precio por participación" required></label><label>Número de participaciones<input type="number" step="any" id="appart" placeholder="Cantidad" required></label><label>Comentario<input id="apnota" placeholder="Opcional"></label><div class="modal-actions"><button type="submit" formnovalidate value="cancel">Cancelar</button><button class="p" type="button" data-a="ap">Guardar aportación</button></div></form></dialog>`}
 function inversiones(){
@@ -132,7 +133,7 @@ function inversiones(){
  AC=cut(sel.length===1?SR[sel[0]]:M.map((k,i)=>({k,ap:sm(i,'ap'),t:sm(i,'t'),val:sm(i,'val')})));
  const act=i=>{const f=S.fondos[i],p=parts(f),n=inv(f),v=p*f.vl,u=f.hist.slice(-1)[0],c=v>=n?'ok':'ko';
  return`<details class="sub" ${dop('a:'+f.n+'|'+f.cartera)}><summary><b>${f.n}</b><span class="inv-summary-values"><span class="inv-total">${eur(v)}</span><span class="${c}">${eur(v-n)} · ${pct(v,n)}</span></span></summary><div class="f"><button data-a="delact" data-i="${i}">Eliminar activo</button></div><small>${CLA[f.clase]||''} ${f.ext||''}${f.moneda&&f.moneda!=='EUR'?' · '+f.moneda+' → EUR':''}</small>
- <div class="g">${kp('Precio actual',pf(f.vl)+' €'+(ext(f)?` <small style="display:inline;margin-left:4px">${pf(f.vlo)} ${SIM[f.moneda]||f.moneda}</small>`:''),'',pSub(f))}${kp('Dinero invertido',eur(n))}${kp('Participaciones',p.toFixed(dec(f)))}${kp('Precio medio de compra',(p?n/p:0).toFixed(2)+' €')}${kp('Valor actual',eur(v))}${kp('Beneficio',eur(v-n)+' · '+pct(v,n),c)}</div>
+ <div class="g">${kp('Precio actual',pf(f.vl)+' €'+(ext(f)?` <small style="display:inline;margin-left:4px">${pf(f.vlo)} ${SIM[f.moneda]||f.moneda}</small>`:''),'',pSub(f))}${kp('Dinero invertido',eur(n))}${kp('Participaciones',fp(p,dec(f)))}${kp('Precio medio de compra',fp(p?n/p:0,2)+' €')}${kp('Valor actual',eur(v))}${kp('Beneficio',eur(v-n)+' · '+pct(v,n),c)}</div>
  <div class="f">${f.fuente?'':`<label>Precio actual (manual) <input type="number" step="any" value="${f.vl}" data-a="vl" data-i="${i}"></label>`}<label>Tipo ${selH('tipo','',[['V','Renta variable'],['F','Renta fija']],f.tipo||'V',i)}</label><label>Cartera ${selH('mv','',S.carteras.map(c=>[c.n,c.n]),f.cartera,i)}</label></div>
  <div class="f"><button class="p" data-a="openap" data-i="${i}">＋ Añadir aportación</button></div>
  <details class="fold"><summary>Evolución mensual</summary>${tablaM(SR[i],dec(f))}</details>
@@ -155,7 +156,7 @@ function historico(){
  R.forEach((r,i)=>{const p=R[i-1];r.vr=p?r.liq-p.liq:0;r.pv=p&&p.liq?r.vr/p.liq*100:0;r.gan=p?r.pat-p.pat:0;r.rat=r.liq+r.val?r.deu/(r.liq+r.val):0;r.total=r.liq+r.val;r.vt=p?r.total-p.total:0;r.pt=p&&p.total?r.vt/p.total*100:0});
  const V=cut(R),c=v=>v>=0?'ok':'ko',h=t=>`<td><b>${t}</b></td>`;
  $('#v').innerHTML=R.length?`<section><h2>Histórico</h2><div class="f">${rgSel()}</div><div style="max-height:480px;overflow:auto"><table><tr>${h('Mes')}${h('Liquidez')}${h('Variación')}${h('%')}${h('Inversión')}${h('Efectivo + inversiones')}${h('Variación')}${h('%')}${h('Deuda total')}${h('Patrimonio neto')}${h('Ganancia patrimonio')}${h('Ratio deuda/activos')}</tr>
- ${V.slice().reverse().map(r=>`<tr><td>${fm(r.k)}</td><td>${eur(r.liq)}</td><td class="${c(r.vr)}">${eur(r.vr)}</td><td class="${c(r.pv)}">${r.pv.toFixed(2)} %</td><td>${eur(r.val)}</td><td>${eur(r.total)}</td><td class="${c(r.vt)}">${eur(r.vt)}</td><td class="${c(r.pt)}">${r.pt.toFixed(2)} %</td><td>${eur(r.deu)}</td><td class="${c(r.pat)}">${eur(r.pat)}</td><td class="${c(r.gan)}">${eur(r.gan)}</td><td>${r.rat.toFixed(2)}</td></tr>`).join('')}</table></div></section>
+ ${V.slice().reverse().map(r=>`<tr><td>${fm(r.k)}</td><td>${eur(r.liq)}</td><td class="${c(r.vr)}">${eur(r.vr)}</td><td class="${c(r.pv)}">${fp(r.pv,2)} %</td><td>${eur(r.val)}</td><td>${eur(r.total)}</td><td class="${c(r.vt)}">${eur(r.vt)}</td><td class="${c(r.pt)}">${fp(r.pt,2)} %</td><td>${eur(r.deu)}</td><td class="${c(r.pat)}">${eur(r.pat)}</td><td class="${c(r.gan)}">${eur(r.gan)}</td><td>${fp(r.rat,2)}</td></tr>`).join('')}</table></div></section>
  <section><h2>Evolución mensual</h2>${lineas(V,[['liq','#6366f1','Liquidez'],['deu','#ef4444','Deuda'],['pat','#10b981','Patrimonio neto']])}
  </section>`:'<section>Aún no hay datos. Añade saldos, deudas o aportaciones.</section>'}
 function ordenar(){const o=(a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:0;['saldos','deudas','intereses'].forEach(k=>S[k].sort(o));S.fondos.forEach(f=>{f.ap.sort(o);f.hist.sort(o)});S.carteras.forEach(c=>c.com.sort(o))}
