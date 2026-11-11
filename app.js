@@ -171,6 +171,7 @@ async function anadir(j){const r=RES[j],c=$('#cart').value;if(S.fondos.some(f=>f
  try{const d=await api('/api/precio?fuente='+r.fuente+'&id='+encodeURIComponent(r.id)),f={n:r.nombre,clase:r.clase,fuente:r.fuente,ext:r.id,cartera:c,moneda:d.moneda,tipo:/bond|treasury|government|fixed income|corporate|aggregate/i.test(r.nombre)?'F':'V',vl:0,ap:[],hist:[]};setVl(f,d.precio,d.fecha,d.orig,d.tc);S.fondos.push(f);RES=[];save();go('Inversiones');msg('Añadido: '+r.nombre)}catch(e){msg('No se pudo: '+e.message)}}
 let updateResults=[],updateStatus='idle';
 function mostrarResumenActualizacion(){
+ if(updateStatus==='busy')return;
  const dlg=document.createElement('dialog');dlg.className='modal update-dialog';
  const rows=updateResults.map(x=>'<tr><td>'+x.nombre+'</td><td>'+(x.precio||'—')+'</td><td>'+(x.fecha||'—')+'</td><td class="'+(x.error?'ko':'ok')+'">'+(x.error?'Error: '+x.error:'Actualizado')+'</td></tr>').join('');
  dlg.innerHTML='<div class="modal-card update-card"><button class="modal-x" type="button" aria-label="Cerrar">×</button><h2>Resumen de actualización</h2><p class="muted">'+updateResults.filter(x=>!x.error).length+' actualizados · '+updateResults.filter(x=>x.error).length+' errores</p><div class="update-table-wrap"><table><thead><tr><td><b>Activo</b></td><td><b>Precio</b></td><td><b>Fecha</b></td><td><b>Estado</b></td></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No se actualizó ningún activo.</td></tr>')+'</tbody></table></div><div class="modal-actions"><button type="button" class="update-close">Cerrar</button></div></div>';
